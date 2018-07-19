@@ -44,4 +44,24 @@ crime_na %>%
   summary()
 ```
 
+```{r}
+crime_na %>%
+  count(county) %>%
+  filter(n > 1)
+
+# county 193 is an exact duplicate 
+crime_na %>%
+  filter(county == 193)
+
+crime_na <- crime_na %>%
+  filter(!duplicated(.))
+
+```
+
+```{r}
+# look at weird 'probability' variables.
+crime_na %>%
+  select(starts_with('pr')) %>%
+  filter_all(any_vars((. > 1) | (. < 0)))
+```
 
