@@ -1,0 +1,30 @@
+---
+title: "Lab 3 - Reducing Crime"
+author: "Clayton G. Leach, Karl I. Siil, Timothy S. Slade"
+date: "July 23, 2018"
+output: 
+  pdf_document: 
+    latex_engine: xelatex
+mainfont: 'Arial'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(knitr)
+```
+
+# Introduction
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
