@@ -16,15 +16,32 @@ library(knitr)
 
 # Introduction
 
-```{r}
 
+
+```{r data_import}
+crime_raw <- read_csv('../crime_v2.csv')
+head(crime_raw)
 ```
 
 ```{r}
 
+# Rows with no data
+crime_na <- crime_raw %>%
+  filter_all(any_vars(!is.na(.)))
+
+# Row with one back tick
+crime_na %>%
+  filter_all(any_vars(is.na(.))) %>%
+  select(which(!is.na(.)))
+  
+crime_na <- crime_na %>%
+  filter_all(all_vars(!is.na(.)))
 ```
 
 ```{r}
 
+crime_na %>%
+  summary()
 ```
+
 
