@@ -19,8 +19,12 @@ library(knitr)
 
 
 ```{r data_import}
-crime_raw <- read_csv('../crime_v2.csv')
-head(crime_raw)
+crime_raw <- read_csv('../crime_v2.csv', 
+                      col_types = cols(
+                        prbconv = col_double()
+                        ))
+problems(crime_raw)
+crime_raw[97, ]
 ```
 
 ```{r}
@@ -61,7 +65,13 @@ crime_na <- crime_na %>%
 ```{r}
 # look at weird 'probability' variables.
 crime_na %>%
-  select(starts_with('pr')) %>%
-  filter_all(any_vars((. > 1) | (. < 0)))
+  filter(!between(prbarr, 0, 1) | 
+           !between(prbconv, 0, 1) |
+           !between(prbpris, 0, 1))
+           
 ```
 
+
+```{r}
+
+```
