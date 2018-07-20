@@ -2,17 +2,25 @@
 title: "Lab 3 - Reducing Crime"
 author: "Clayton G. Leach, Karl I. Siil, Timothy S. Slade"
 date: "July 23, 2018"
+mainfont: 'Arial'
+header-includes:
+- \usepackage{caption}
+- \usepackage{hhline}
+- \usepackage{footnote}
+- \usepackage{array}
+- \usepackage{booktabs}
+#- \usepackage{minted}
 output: 
   pdf_document: 
     latex_engine: xelatex
-mainfont: 'Arial'
+    pandoc_args: "--pdf-engine-opt=-shell-escape"
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(knitr)
-library(here) # Added this to handle the user-agnostic run. ~TS
+library(here) # TS: Added this to handle the user-agnostic run.
 library(car)
 ```
 
@@ -34,9 +42,9 @@ crime_raw[97, ]
 ## Missing Values
 
 ```{r drop_blank_rows}
-# Rows with no data
+# KS: Rows with no data
 crime_na <- crime_raw %>% filter_all(any_vars(!is.na(.)))
-# Row with one back tick
+# KS: Row with one back tick
 crime_na %>% filter_all(any_vars(is.na(.))) %>% select(which(!is.na(.)))
 crime_na <- crime_na %>% filter_all(all_vars(!is.na(.)))
 ```
@@ -78,7 +86,7 @@ The notes on `prbarr` indicate _the probability of arrest is proxied by the rati
 
 In both cases, there are plausible explanations for the values we observe. Therefore we will not drop these records from our dataset. We will, however, subject them to further scrutiny.
 
-```{r plausibility_checks, echo = FALSE, results = "hide"}
+```{r plausibility_checks, echo = FALSE, results = "hide", fig.show = "hide"}
 plot(density(crime_na$year)) # TS: Confirmed all 1987
 plot(density(crime_na$crmrte)) # TS: Confirmed all positive
 plot(density(crime_na$prbarr)) # TS: Confirmed all positive
@@ -108,4 +116,67 @@ Examining the remainder of our data, we found no substantial evidence of _top-co
 # Research Question and Model-Building
 
 Our **research question** is the following: _What are the determinants of crime at the county level?_
+
+We face a key limitation: our data does not give us visibility into crime, it only gives us insight into the official _crime rate_. The crime rate is a function not only of crimes committed but also of various factors, some of which may be unobservable. For instance, poor community-police relations may bias crime rates downward if an area's residents **[do not report all the crimes they observe or experience](https://www.washingtonpost.com/news/acts-of-faith/wp/2018/04/19/churches-make-a-drastic-pledge-in-the-name-of-social-justice-to-stop-calling-the-police/?utm_term=.ac2ea8ee1523)**. Converseley, those poor relations may also bias crime rates upward if police officers engage in **[predatory policing practices](https://www.huffingtonpost.com/2015/05/04/st-louis-county-predatory-policing_n_7201964.html)** and the community lacks the wherewithal to fight back. As we report our findings we will make note of potential bias that results from our inability to observe and analyze critical variables.
+
+## Explanatory variables of interest
+
+The table below details several main variables of interest we will use to build and refine our model.
+
+\begin{center} % https://community.rstudio.com/t/inserting-table-in-r-markdown/7260/4
+\captionof{table}{Hypothesized Primary Determinants of Observed Crime Rate}
+\begin{tabular}{|l|l|p{7cm}|p{2cm}|}
+\hline
+Variable Name & Explanation & Reasoning & Transformation Applied \\ \hhline{|=|=|=|=|}
+\texttt{polpc} & \textit{police per capita} & Police may act as a deterrent to crime, may increase the observed crime rate, or both. & <none> \\
+\texttt{pctymle} & \textit{percent young male} & Young males commit and are charged with a disproportionate share of crimes & <none> \\
+\texttt{density} & \textit{people per sq. mile} & Greater population density increases opportunity for crimes to be committed and reported & <none> \\
+\texttt{taxpc} & \textit{tax revenue per capita} & Lower tax revenues may be associated with poorer community-government relations, greater economic hardship, and less policing \footnote{This may introduce collinearity with several other variables} & $log_{10}$  \\
+\texttt{prbarr} & \textit{`probability' of arrest} & Greater probability of arrest may serve a deterrent function & <none> \\
+\texttt{prbconv} & \textit{`probability' of conviction} & Greater probability of conviction may serve a deterrent function & <none> \\
+\texttt{prbpris} & \textit{`probability' of prison sentence} & Greater probability of sentencing may serve a deterrent function & <none> \\
+\texttt{avgsen} & \textit{average sentence, in days} & Harsher sentencing practices may serve a deterrent function & <none> \\
+\texttt{pctmin80} & \textit{percent minority in 1980} & Minorities are disproportionately arrested and convicted of crimes & <none> \\
+\hline
+\end{tabular}
+\end{center}
+
+\[
+%\begin{table}
+%\centering
+%\begin{tabular}{l>{\raggedright\arraybackslash$}p{2cm}<{$}{\raggedright\arraybackslash$}p{6cm}<{$}c}
+%\toprule
+%Variable Name & Explanation & Reasoning & Transformation Applied \\ \midrule
+%\texttt{polpc} & \textit{police per capita} & Police may act as a deterrent to crime, may increase the observed crime rate, or both. & <none> \\
+%\texttt{pctymle} & \textit{percent young male} & Young males commit and are charged with a disproportionate share of crimes & <none> \\
+%\texttt{density} & \textit{people per sq. mile} & Greater population density increases opportunity for crimes to be committed and reported & <none> \\
+%\texttt{taxpc} & \textit{tax revenue per capita} & Lower tax revenues may be associated with poorer community-government relations, greater economic hardship, and less policing \footnote{This may introduce collinearity with several other variables} & $log_10$  \\
+%\texttt{prbarr} & \textit{`probability' of arrest} & Greater probability of arrest may serve a deterrent function & <none> \\
+%\texttt{prbconv} & \textit{`probability' of conviction} & Greater probability of conviction may serve a deterrent function & <none> \\
+%\texttt{prbpris} & \textit{`probability' of prison sentence} & Greater probability of sentencing may serve a deterrent function & <none> \\
+%\texttt{avgsen} & \textit{average sentence, in days} & Harsher sentencing practices may serve a deterrent function & <none> \\
+%\texttt{pctmin80} & \textit{percent minority in 1980} & Minorities are disproportionately arrested and convicted of crimes & <none> \\
+%\midrule
+%\end{tabular}
+%\caption{Hypothesized Primary Determinants of Observed Crime Rate}
+%\label{pntable}
+%\end{table}
+\]
+
+
+
+```{r lm_1}
+lm_mod1a <- with(crime_na, lm(crmrte ~ polpc + pctymle))
+lm_mod1b <- with(crime_na, lm(crmrte ~ polpc + pctymle + density))
+lm_mod1c <- with(crime_na, lm(crmrte ~ polpc + pctymle + density + log(taxpc, base = 10)))
+lm_mod1d <- with(crime_na, lm(crmrte ~ polpc + pctymle + density + log(taxpc, base = 10) +
+                                  prbarr + prbconv + prbpris))
+lm_mod1e <- with(crime_na, lm(crmrte ~ polpc + pctymle + density + log(taxpc, base = 10) +
+                                  prbarr + prbconv + prbpris + avgsen))
+#lm_mod1 <- with(crime_na, lm(crmrte ~ polpc + pctymle + density + log(taxpc, base = 10) + prbarr + prbconv + prbpris + avgsen))
+```
+
+Once \texttt{pctymle} and \texttt{density} are included in the model, \texttt{polpc} loses its significance.
+
+
 
