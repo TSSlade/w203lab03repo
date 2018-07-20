@@ -1,0 +1,51 @@
+---
+title: "Lab 03 EDA"
+author: "Timothy S. Slade"
+date: "July 12, 2018"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, eval = TRUE, tidy = TRUE)
+tidy.opts=list(blank=FALSE, width.cutoff=60)
+```
+
+## Workspace Preparation
+
+In the following chunk we load the libraries we intend to use in this EDA.
+
+```{r libraries}
+library("here")
+library("dplyr")
+library("ggplot2")
+library("car")
+```
+
+Now we set the workspace and load our dataset.
+
+```{r workspace}
+here::dr_here()
+df <- data.frame(read.csv(file = "crime_v2.csv"))
+```
+
+The dataset contains `r length(names(df))` variables and `r nrow(df)` observations.
+
+```{r characterizing_df}
+names(df)
+summary(df)
+```
+
+We have the following guidance from the instructors regarding the contents of our initial Lab03 submission:
+
+1. State your research question clearly, succinctly.
+2. State your goals precisely, they need to be in finite terms, not open ended.
+3. Explain clearly what motivates your research, your interest in this dataset and wrap around it how you plan to carry this research out(clear steps, iterative approach)
+4. Do #1,2 first, determine your motivation first and in the end stick to 2-3 variables that most interest you, why, why you decided to pick them vs not some others
+5. Be sure that your chosen variables are directly related to your proposed questions.
+And finally Eric added that do read and understand the units 9,10,11 carefully as that will help understand key elements of this approach. 
+
+# Draft Report
+
+_Your task is to examine the data to help the campaign understand the determinants of crime and to generate policy suggestions that are applicable to local government._
+
+Crime rates and police activity are likely to exhibit regional effects.

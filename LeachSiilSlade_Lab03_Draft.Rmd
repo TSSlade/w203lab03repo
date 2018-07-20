@@ -12,66 +12,100 @@ mainfont: 'Arial'
 knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(knitr)
+library(here) # Added this to handle the user-agnostic run. ~TS
+library(car)
 ```
 
 # Introduction
 
+Our client is running for office in the state of North Carolina (NC). Her campaign commissioned us to research the determinants of crime in NC to help her develop her platform regarding crime-related policy initiatives at the level of local government. This report explores a 1994 dataset from Cornwell & Trumball that provides county-level economic, demographic, and crime data. Our analysis describes the dataset, presents some initial summary statistics, develops three plausible models of the determinants of crime, and evaluates their accuracy and utility.
 
+# Initial Exploratory Data Analysis (EDA)
 
-```{r data_import}
-crime_raw <- read_csv('../crime_v2.csv', 
-                      col_types = cols(
-                        prbconv = col_double()
-                        ))
-problems(crime_raw)
+```{r data_import, echo = FALSE, results = "hide"}
+#here::dr_here() # TS: Use on first run to see why it fails on your machine, if it does.
+here::here() # TS: Use when all set up, so we can mask the output.
+#crime_raw <- read_csv('../crime_v2.csv', # TS: Commented out b/c using "here()" don't need ../
+crime_raw <- read_csv('crime_v2.csv', col_types = cols( prbconv = col_double()))
+problems(crime_raw) # TS: To comment out once we're ready to generate our draft report.
 crime_raw[97, ]
 ```
 
-```{r}
+## Missing Values
 
+```{r drop_blank_rows}
 # Rows with no data
-crime_na <- crime_raw %>%
-  filter_all(any_vars(!is.na(.)))
-
+crime_na <- crime_raw %>% filter_all(any_vars(!is.na(.)))
 # Row with one back tick
-crime_na %>%
-  filter_all(any_vars(is.na(.))) %>%
-  select(which(!is.na(.)))
-  
-crime_na <- crime_na %>%
-  filter_all(all_vars(!is.na(.)))
+crime_na %>% filter_all(any_vars(is.na(.))) %>% select(which(!is.na(.)))
+crime_na <- crime_na %>% filter_all(all_vars(!is.na(.)))
 ```
 
-```{r}
+Upon loading the data, we examine the `r nrow(crime_raw %>% filter_all(any_vars(is.na(.))))` rows that are missing data, finding that 5 are entirely blank and 1 contains only a backtick. We eliminate those to generate our working dataset.
 
-crime_na %>%
-  summary()
+```{r summary, include=FALSE}
+crime_na %>% summary() # TS: I think we'll want to suppress this snippet in the draft we turn in...added include = FALSE
 ```
 
-```{r}
-crime_na %>%
-  count(county) %>%
-  filter(n > 1)
+## Erroneous Duplicate Records
 
-# county 193 is an exact duplicate 
-crime_na %>%
-  filter(county == 193)
-
-crime_na <- crime_na %>%
-  filter(!duplicated(.))
-
+```{r find_dup_county}
+crime_na %>% count(county) %>% filter(n > 1) # county 193 is an exact duplicate 
+crime_na %>% filter(county == 193)
 ```
 
-```{r}
+Continuing our QC, we note that one of the counties' records has been duplicated exactly. We therefore drop the duplicate record from our dataset.
+
+```{r drop_dup_county}
+crime_na <- crime_na %>% filter(!duplicated(.))
+```
+
+## Plausibility Checks for Variables
+
+Three of our key variables of interest (`prbarr`, `prbconv`, and `prbpris`) represent probabilities and should therefore theoretically be in the range of 0:1.
+
+```{r prob_beyond_range}
 # look at weird 'probability' variables.
-crime_na %>%
-  filter(!between(prbarr, 0, 1) | 
-           !between(prbconv, 0, 1) |
-           !between(prbpris, 0, 1))
-           
+non_prob <- crime_na %>%
+  filter(!between(prbarr, 0, 1) | !between(prbconv, 0, 1) | !between(prbpris, 0, 1))
 ```
 
+Examining the data, we find `r nrow(non_prob)` counties have values for the "probability" variables that are outside of the expected range. In each case, it is either `prbconv` (10 records) or `prbarr` (1 record) that fall outside the range.
 
-```{r}
+Per the notes accompanying our data, _The probability of conviction is proxied by the ratio of convictions to arrests..._ Given that definition, if not all suspects arrested are convicted, `prbconv` will be below 1. However, it may also exceed 1 if the number of exonerated suspects is exceeded by the number of suspects convicted of multiple charges. (See **[here](https://www.michigancriminallawyer-blog.com/2014/08/this-blog-is-based-upon.html)** for examples of multiple charges stemming from a single arrest.)
 
+The notes on `prbarr` indicate _the probability of arrest is proxied by the ratio of arrests to offenses..._. If multiple suspects are arrested for a single offense, and this happens more frequently than offenses which do not lead to arrests, `prbarr` would indeed exceed 1.
+
+In both cases, there are plausible explanations for the values we observe. Therefore we will not drop these records from our dataset. We will, however, subject them to further scrutiny.
+
+```{r plausibility_checks, echo = FALSE, results = "hide"}
+plot(density(crime_na$year)) # TS: Confirmed all 1987
+plot(density(crime_na$crmrte)) # TS: Confirmed all positive
+plot(density(crime_na$prbarr)) # TS: Confirmed all positive
+plot(density(crime_na$prbconv)) # TS: Confirmed all positive
+plot(density(crime_na$prbpris)) # TS: Confirmed all positive
+plot(density(crime_na$avgsen)) # TS: Confirmed all positive
+plot(density(crime_na$polpc)) # TS: Confirmed all positive; in boxplot, 1 outlier
+plot(density(crime_na$density)) # TS: Confirmed all positive; in boxplot, 8 outliers
+plot(density(crime_na$taxpc)) # TS: Confirmed all positive; in boxplot, several outliers
+plot(density(crime_na$west)) # TS: Confirmed all either 0 or 1
+plot(density(crime_na$central)) # TS: Confirmed all either 0 or 1
+plot(density(crime_na$urban)) # TS: Confirmed all either 0 or 1
+plot(density(crime_na$pctmin80)) # TS: Confirmed all positive, between 0 and 100
+plot(density(crime_na$wcon))
+plot(density(crime_na$wtuc))
+plot(density(crime_na$wtrd))
+plot(density(crime_na$wfir))
+plot(density(crime_na$wser)) # TS: Some serious outliers at > $2000
+plot(density(crime_na$wmfg))
+plot(density(crime_na$wsta))
+plot(density(crime_na$wloc))
+plot(density(crime_na$mix))
 ```
+
+Examining the remainder of our data, we found no substantial evidence of _top-coded_ or _bottom-coded_ (i.e., truncated) variables which might bias our regression models. However, there is an extreme outlier in `wser`, the variable indicating the county's weekly wage in the service industry.
+
+# Research Question and Model-Building
+
+Our **research question** is the following: _What are the determinants of crime at the county level?_
+
