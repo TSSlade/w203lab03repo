@@ -112,7 +112,9 @@ plot(density(crime_na$wloc))
 plot(density(crime_na$mix))
 ```
 
-Examining the remainder of our data, we found no substantial evidence of _top-coded_ or _bottom-coded_ (i.e., truncated) variables which might bias our regression models. However, there is an extreme outlier in `wser`, the variable indicating the county's weekly wage in the service industry.
+Examining the remainder of our data, we found no substantial evidence of _top-coded_ or _bottom-coded_ (i.e., truncated) variables which might bias our regression models. However, there is an extreme outlier in `wser`, the variable indicating the county's weekly wage in the service industry.  To determine if this is valid we looked at the wage values for other sectors of the economy and did not see elevated values.  It is improbable that individuals in the service industry are making 5-10x more than anyone else in the county, and therefore we will replace this value with an NA. 
+
+--Talk about 1 row with probabiltiy of arrest, conviction, and police as outliers.
 
 # Research Question and Model-Building
 
@@ -185,6 +187,13 @@ Variable Name & Explanation & Reasoning & Transformation Applied \\ \hhline{|=|=
 In order to answer our research question we created a model which included variables related to key crime policy decisions.  We only included variables which would allow our canadidate to make concrete policy proposals that lie within her purview.
 
 Using the aforementioned criteria we choose the variables police per capita (polpc), probability of arrest (prbarr), probability of conviction (prbconv), probability of incarceration, and average sentence length for our first model.  Understanding how these items relate to crime rate can help shape her position, and understand whether a "Tough on Crime" stance does in fact acheive a reduction in crime.  Speciically, we can help her understand which departement/function should receive additional funding given a limited budget (e.g. if conviction rates are highly correlated perhaps we invest more in our District Attorneys).
+
+## Transformation Analysis
+
+--Evaluate the scatter of each of the 5 variables to see if a transform is necessary.
+--Final table with new transforms.  
+  Police should be log transformed.
+  probability of prison should be squared
 
 ``` {r model 1}
 #Linear Regression model using only our key variables of interest.
@@ -289,7 +298,11 @@ Despite the promising results from our three models it is difficult to ascribe c
 
 3) Concentrated/Siloed Urban Blight: Our data is at the county level and therefore may obscure differences within the county.  We would expect there to be a difference in crime rates between a county which is relatively homogenous with respect to the variables, and one which has drastic differences (e.g. a very poor area and a very nice area).  One way to proxy this might be to calculate a normalized standard deviation of housing prices which could help capture if this phenomenom exists.  
 
-4) 
+4) Policing Methodology:
+
+5) Police Representation: 
+
+6) 
 
 ## Findings and Policy Recommendations
 
