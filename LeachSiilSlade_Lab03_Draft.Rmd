@@ -2,7 +2,6 @@
 title: "Lab 3 - Reducing Crime"
 author: "Clayton G. Leach, Karl I. Siil, Timothy S. Slade"
 date: "July 23, 2018"
-mainfont: 'Arial'
 header-includes:
 - \usepackage{caption}
 - \usepackage{hhline}
@@ -23,11 +22,12 @@ library(knitr)
 library(here) # TS: Added this to handle the user-agnostic run.
 library(car)
 library(stargazer)
+library(broom)
 ```
 
 # Introduction
 
-Our client is running for office in the state of North Carolina (NC). Her campaign commissioned us to research the determinants of crime in NC to help her develop her platform regarding crime-related policy initiatives at the level of local government. This report explores a 1994 dataset from Cornwell & Trumball that provides county-level economic, demographic, and crime data. Our analysis describes the dataset, presents some initial summary statistics, develops three plausible models of the determinants of crime, and evaluates their accuracy and utility.
+Our client is running for office in the state of North Carolina (NC). Her campaign commissioned us to research the determinants of crime in NC to help her develop her platform regarding crime-related policy initiatives at the level of local government. This report explores a 1994 dataset from Cornwell & Trumball that provides county-level economic, demographic, and crime data. Our analysis describes the dataset, presents initial summary statistics, and develops three linear regression models.
 
 # Initial Exploratory Data Analysis (EDA)
 
@@ -116,7 +116,7 @@ Examining the remainder of our data, we found no substantial evidence of _top-co
 
 # Research Question and Model-Building
 
-Our **research question** is the following: _What enforcement policies should our candidate endorse to reduce crime rates?_
+Our **research question** is the following: _Should our candidate support a traditional "Tough on Crime" platform? _
 
 We face a key limitation: our data does not give us visibility into crime, it only gives us insight into the official _crime rate_. The crime rate is a function not only of crimes committed but also of various factors, some of which may be unobservable. For instance, poor community-police relations may bias crime rates downward if an area's residents **[do not report all the crimes they observe or experience](https://www.washingtonpost.com/news/acts-of-faith/wp/2018/04/19/churches-make-a-drastic-pledge-in-the-name-of-social-justice-to-stop-calling-the-police/?utm_term=.ac2ea8ee1523)**. Conversely, those poor relations may also bias crime rates upward if police officers engage in **[predatory policing practices](https://www.huffingtonpost.com/2015/05/04/st-louis-county-predatory-policing_n_7201964.html)** and the community lacks the wherewithal to fight back. As we report our findings we will make note of potential bias that results from our inability to observe and analyze critical variables.
 
@@ -182,14 +182,19 @@ Variable Name & Explanation & Reasoning & Transformation Applied \\ \hhline{|=|=
 %\end{table}
 \]
 
-In order to answer our research question we created a model which included variables related to key crime policy decisions.  We only included variables which would allow our cnadidate to make concrete policy proposals that lie within her purview.
+In order to answer our research question we created a model which included variables related to key crime policy decisions.  We only included variables which would allow our canadidate to make concrete policy proposals that lie within her purview.
 
-Using the aforementioned criteria we choose the variables police per capita (polpc), probability of arrest (prbarr), probability of conviction (prbconv), probability of incarceration, and average sentence length for our first model.  Understanding how these items relate to crime rate can help shape her position, and understand whether a "Tough on Crime" stance does in fact acheive a reduction in crime.
+Using the aforementioned criteria we choose the variables police per capita (polpc), probability of arrest (prbarr), probability of conviction (prbconv), probability of incarceration, and average sentence length for our first model.  Understanding how these items relate to crime rate can help shape her position, and understand whether a "Tough on Crime" stance does in fact acheive a reduction in crime.  Speciically, we can help her understand which departement/function should receive additional funding given a limited budget (e.g. if conviction rates are highly correlated perhaps we invest more in our District Attorneys).
 
 ``` {r model 1}
+#Linear Regression model using only our key variables of interest.
 model1 <- with(crime_na, lm(crmrte ~ polpc+prbarr+prbconv+prbpris+avgsen))
+
+#Adding AIC to our model to help us compare models in the future.
 model1$AIC <- AIC(model1)
-summary(model1)
+
+#Output model results in nice format using tidy and kable
+kable(tidy(model1))
 ```
 
 Comments on Model 1:
@@ -217,13 +222,29 @@ Probability Incarceration and Average sentencing may also be correlated with the
 
   
 ``` {r model 2}
+#Model with our key explanatory variables, and what we suspect to be key covariates
 model2 <- with(crime_na, lm(crmrte ~ polpc+prbarr+prbconv+prbpris+avgsen+log(taxpc, base = 10)+density+govt_wg+pctymle+pctmin80))
+
+model2_no_minorityvariable <- with(crime_na, lm(crmrte ~ polpc+prbarr+prbconv+prbpris+avgsen+log(taxpc, base = 10)+density+govt_wg+pctymle))
+
+added_adj_r_squared <- summary(model2)$adj.r.squared - summary(model2_no_minorityvariable)$adj.r.squared
+
+#Adding AIC to our model to help us compare models in the future.
 model2$AIC <- AIC(model2)
-summary(model2)
+
+#Output model results in nice format using tidy and kable
+kable(tidy(model2))
 ```
 
 Notes on Model 2:
 
+1) One item of interest was the extreme degree of signifcance we see associated with our percent minority variable (pctmin80).  Interestingly, when using only this variable to predict crime rates our R squared value is very low, however after controlling for other factors this variable becomes extremely important.  One way to measure this importance is by calculating the delta in adjusted R squared between a model with and without this variable.
+
+``` {r minority_variable_addition}
+cat("When including the minority variable our adjusted R squared is,",round(summary(model2)$adj.r.squared,3),"and when excluding this variable our adjusted R squared is,",round(summary(model2_no_minorityvariable)$adj.r.squared,3),",which equates to a delta of",round((summary(model2)$adj.r.squared-summary(model2_no_minorityvariable)$adj.r.squared),3))
+```
+
+2)
 
 
 ## Model 3
@@ -231,25 +252,42 @@ Notes on Model 2:
 Given the countless ways behavioral issues are interconnected, we wondered whether every variable we had data on was correlated with either crime rate or an already included variable in some fashion.  Our focus was to determine if including all our variables substantially changed the significance or corefficient of any of our previously included variables.  Additionally, we wanted to understand if any of the variables we had previously left out were in fact predictive overall. 
 
 ``` {r model 3}
+#Linear model including our key explanatory variables, suspected covariates, and most other variables
 model3 <- with(crime_na, lm(crmrte ~ polpc+prbarr+prbconv+prbpris+avgsen+log(taxpc, base = 10)+density+govt_wg+pctymle+pctmin80+west+central+urban+physical_wg+industry_wg+mix))
+
+#Adding AIC to our model to help us compare models in the future.
 model3$AIC <- AIC(model3)
-summary(model3)
+
+#Output model results in nice format using tidy and kable
+kable(tidy(model3))
 ```
 
 Model 3 Notes:
 
+## Model Comparison
 
+Below is a comparison table for our three models, along with key statistics related to the model.  Our findings match with what we would hope to see from a model building perspective: Our AIC and adjusted R squared numbers suggest that the model which includes both our key explanatory variables and plausible covariates performs the best.  Our model which excludes key covariates has significantly less predictive power (as measured by adjusted R squared), and our model which includes everything--despite having the highest unadjusted R squared--performed worse as we arbitrarily added additional variables.
 
 ```{r stargazer, results = "asis"}
 # Code from here: https://stackoverflow.com/questions/47494761/show-akaike-criteria-in-stargazer (using the example 2 approach)
 stargazer(model1, model2, model3,
           type = "latex", report="vc", header=FALSE,
           title = "Linear Models Predicting Crime Rate",
-          keep.stat = c("aic", "rsq", "n"), omit.table.layout = "n")
+          keep.stat = c("aic", "rsq","adj.rsq","n"), omit.table.layout = "n")
 
 
 ```
 
+## Omitted Variables
+
+Despite the promising results from our three models it is difficult to ascribe causality to the variables of interest.  One issue with causal inference in general is ommitted variable bias, which can invalidate our ability to assume each explanatory variable is uncorrelated with the error term.  While there are infinite variables which exist, there are several which deserve commentary:
+
+
+1) Political Party in Control: Traditionally the issue of crime policy is a highly partisan issue, with each party having very different approaches to crime reduction.  All else being equal, we might expect police levels and average sentence lengths to be correlated with the party that is crafting legislation.  Assuming we construct our variable as a boolean indicator ("is_republican"), we might expect the coefficient for police per capita to diminish as we assume a priori that higher police levels are correlated with conservative crime policies.
+
+2) Unemployment Rate: While we have data on weekly wages, this does nothing to tell us what percentage of the population was actually earning those wages.  It is likely that a higher unemployment rate would be correlated with higher rates of crime as people who may not normally commit criminal activity are pushed to their limits.  We might also wish to be more granular, and include both minority and majority unemployment rates to help control for racial inequality.
+
+3) 
 
 ## Findings and Policy Recommendations
 
