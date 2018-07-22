@@ -283,11 +283,13 @@ stargazer(model1, model2, model3,
 Despite the promising results from our three models it is difficult to ascribe causality to the variables of interest.  One issue with causal inference in general is ommitted variable bias, which can invalidate our ability to assume each explanatory variable is uncorrelated with the error term.  While there are infinite variables which exist, there are several which deserve commentary:
 
 
-1) Political Party in Control: Traditionally the issue of crime policy is a highly partisan issue, with each party having very different approaches to crime reduction.  All else being equal, we might expect police levels and average sentence lengths to be correlated with the party that is crafting legislation.  Assuming we construct our variable as a boolean indicator ("is_republican"), we might expect the coefficient for police per capita to diminish as we assume a priori that higher police levels are correlated with conservative crime policies.
+1) Political Party in Control: Traditionally the issue of crime policy is a highly partisan issue, with each party having very different approaches to crime reduction.  All else being equal, we might expect police levels and average sentence lengths to be correlated with the party that is crafting legislation.  Assuming we construct our variable as a boolean indicator ("is_republican"), we might expect the coefficient for police per capita to diminish as we assume a priori that higher police levels are correlated with conservative crime policies.  We could include this data by appending public records to our dataset which would be more appropriate than trying to find some other variable to proxy.
 
-2) Unemployment Rate: While we have data on weekly wages, this does nothing to tell us what percentage of the population was actually earning those wages.  It is likely that a higher unemployment rate would be correlated with higher rates of crime as people who may not normally commit criminal activity are pushed to their limits.  We might also wish to be more granular, and include both minority and majority unemployment rates to help control for racial inequality.
+2) Unemployment Rate: While we have data on weekly wages, this does nothing to tell us what percentage of the population was actually earning those wages.  It is likely that a higher unemployment rate would be correlated with higher rates of crime as people who may not normally commit criminal activity are pushed to their limits.  We might also wish to be more granular, and include both minority and majority unemployment rates to help control for racial inequality.  We realistically could obtain this data from the Bearue of Labor Statistics and append it to our dataset; we leave this next step to future researchers.
 
-3) 
+3) Concentrated/Siloed Urban Blight: Our data is at the county level and therefore may obscure differences within the county.  We would expect there to be a difference in crime rates between a county which is relatively homogenous with respect to the variables, and one which has drastic differences (e.g. a very poor area and a very nice area).  One way to proxy this might be to calculate a normalized standard deviation of housing prices which could help capture if this phenomenom exists.  
+
+4) 
 
 ## Findings and Policy Recommendations
 
