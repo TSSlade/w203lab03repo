@@ -184,7 +184,7 @@ Variable Name & Explanation & Reasoning & Transformation Applied \\ \hhline{|=|=
 
 In order to answer our research question we created a model which included variables related to key crime policy decisions.  We only included variables which would allow our cnadidate to make concrete policy proposals that lie within her purview.
 
-Using the aforementioned criteria we choose the variables police per capita (polpc), probability of arrest (prbarr), probability of conviction (prbconv), probability of incarceration, and average sentence length for our first model.
+Using the aforementioned criteria we choose the variables police per capita (polpc), probability of arrest (prbarr), probability of conviction (prbconv), probability of incarceration, and average sentence length for our first model.  Understanding how these items relate to crime rate can help shape her position, and understand whether a "Tough on Crime" stance does in fact acheive a reduction in crime.
 
 ``` {r model 1}
 model1 <- with(crime_na, lm(crmrte ~ polpc+prbarr+prbconv+prbpris+avgsen))
@@ -218,7 +218,7 @@ Probability Incarceration and Average sentencing may also be correlated with the
   
 ``` {r model 2}
 model2 <- with(crime_na, lm(crmrte ~ polpc+prbarr+prbconv+prbpris+avgsen+log(taxpc, base = 10)+density+govt_wg+pctymle+pctmin80))
-model2$AIC <- AIC(model1)
+model2$AIC <- AIC(model2)
 summary(model2)
 ```
 
@@ -226,34 +226,23 @@ Notes on Model 2:
 
 
 
-```{r lm_1}
-lm_mod1a <- with(crime_na, lm(crmrte ~ polpc + pctymle))
-lm_mod1b <- with(crime_na, lm(crmrte ~ polpc + pctymle + density))
-lm_mod1c <- with(crime_na, lm(crmrte ~ polpc + pctymle + density + log(taxpc, base = 10)))
-lm_mod1d <- with(crime_na, lm(crmrte ~ polpc + pctymle + density + log(taxpc, base = 10) +
-                                  prbarr + prbconv + prbpris))
-lm_mod1e <- with(crime_na, lm(crmrte ~ polpc + pctymle + density + log(taxpc, base = 10) +
-                                  prbarr + prbconv + prbpris + avgsen))
-#lm_mod1 <- with(crime_na, lm(crmrte ~ polpc + pctymle + density + log(taxpc, base = 10) + prbarr + prbconv + prbpris + avgsen))
+## Model 3
 
-lm_modwages <- with(crime_na, lm(crmrte ~ wcon + wtuc + wtrd +wfir +wser + wmfg + wfed + wsta + wloc))
-lm_probs <- with(crime_na, lm(crmrte ~ prbarr + prbconv + prbpris))
+Given the countless ways behavioral issues are interconnected, we wondered whether every variable we had data on was correlated with either crime rate or an already included variable in some fashion.  Our focus was to determine if including all our variables substantially changed the significance or corefficient of any of our previously included variables.  Additionally, we wanted to understand if any of the variables we had previously left out were in fact predictive overall. 
 
-# Adding the AICs
-lm_mod1a$AIC <- AIC(lm_mod1a)
-lm_mod1b$AIC <- AIC(lm_mod1b)
-lm_mod1c$AIC <- AIC(lm_mod1c)
-lm_mod1d$AIC <- AIC(lm_mod1d)
-lm_mod1e$AIC <- AIC(lm_mod1e)
-lm_modwages$AIC <- AIC(lm_modwages)
-lm_probs$AIC <- AIC(lm_probs)
+``` {r model 3}
+model3 <- with(crime_na, lm(crmrte ~ polpc+prbarr+prbconv+prbpris+avgsen+log(taxpc, base = 10)+density+govt_wg+pctymle+pctmin80+west+central+urban+physical_wg+industry_wg+mix))
+model3$AIC <- AIC(model3)
+summary(model3)
 ```
 
-Once \texttt{pctymle} and \texttt{density} are included in the model, \texttt{polpc} loses its significance.
+Model 3 Notes:
+
+
 
 ```{r stargazer, results = "asis"}
 # Code from here: https://stackoverflow.com/questions/47494761/show-akaike-criteria-in-stargazer (using the example 2 approach)
-stargazer(lm_mod1a, lm_mod1b, lm_mod1c, lm_mod1d, lm_mod1e,
+stargazer(model1, model2, model3,
           type = "latex", report="vc", header=FALSE,
           title = "Linear Models Predicting Crime Rate",
           keep.stat = c("aic", "rsq", "n"), omit.table.layout = "n")
@@ -262,3 +251,6 @@ stargazer(lm_mod1a, lm_mod1b, lm_mod1c, lm_mod1d, lm_mod1e,
 ```
 
 
+## Findings and Policy Recommendations
+
+## Conclusion
