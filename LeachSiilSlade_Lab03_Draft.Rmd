@@ -116,7 +116,7 @@ Examining the remainder of our data, we found no substantial evidence of _top-co
 
 # Research Question and Model-Building
 
-Our **research question** is the following: _What are the determinants of crime at the county level?_
+Our **research question** is the following: _What enforcement policies should our candidate endorse to reduce crime rates?_
 
 We face a key limitation: our data does not give us visibility into crime, it only gives us insight into the official _crime rate_. The crime rate is a function not only of crimes committed but also of various factors, some of which may be unobservable. For instance, poor community-police relations may bias crime rates downward if an area's residents **[do not report all the crimes they observe or experience](https://www.washingtonpost.com/news/acts-of-faith/wp/2018/04/19/churches-make-a-drastic-pledge-in-the-name-of-social-justice-to-stop-calling-the-police/?utm_term=.ac2ea8ee1523)**. Conversely, those poor relations may also bias crime rates upward if police officers engage in **[predatory policing practices](https://www.huffingtonpost.com/2015/05/04/st-louis-county-predatory-policing_n_7201964.html)** and the community lacks the wherewithal to fight back. As we report our findings we will make note of potential bias that results from our inability to observe and analyze critical variables.
 
@@ -128,13 +128,12 @@ All together there are 9 wage variables, each representing a different sector/in
   2) Physical Labor Wage: Average of wmfg (Manufacturing), wser (Service), wcon (Construction)
   3) Industry Wage: Average of wfir (Finance/Investment/Real Estate), wtrd (Wholesale/Retail Trade), and wtuc          (Transportation, Utilities, Communication)
   
-Additionally, there have been media reports that income inequality is a factor in crime.  In an attempt to proxy this we created a fourth wage variable "income_inequality_proxy" which is the difference between the "Physical Labor Wage" and the "Industry Wage"
 
 ``` {r new_variable_creation}
 crime_na$govt_wg <- (crime_na$wfed+crime_na$wsta+crime_na$wloc)/3
 crime_na$physical_wg <- (crime_na$wmfg+crime_na$wser+crime_na$wcon)/3
 crime_na$industry_wg <- (crime_na$wfir+crime_na$wtrd+crime_na$wtuc)/3
-crime_na$income_inequality_proxy <- crime_na$industry_wg - crime_na$physical_wg
+
 ```
 
 ## Explanatory variables of interest
@@ -183,97 +182,49 @@ Variable Name & Explanation & Reasoning & Transformation Applied \\ \hhline{|=|=
 %\end{table}
 \]
 
-## Simple (Single Variable OLS) Regression
+In order to answer our research question we created a model which included variables related to key crime policy decisions.  We only included variables which would allow our cnadidate to make concrete policy proposals that lie within her purview.
 
-To begin our model building process we wanted to understand how each explanatory variable looked in isolation.  This approach can help illuminate variables of interest, as well as ones which can be reasonably excluded from our first model.  It's important to note that a low R squared value alone doesn't mean the variable isn't of interest, as that explanatory power might be independent of other variables; however, if the R squared value is extroardinarily low, then we can confidently exlucde it from our first model.
-
-```{r simple_OLS}
-lm_polpc <- with(crime_na, lm(crmrte ~ polpc))
-lm_pctymle <- with(crime_na, lm(crmrte ~ pctymle))
-lm_density <- with(crime_na, lm(crmrte ~ density))
-lm_taxpc <- with(crime_na, lm(crmrte ~ log(taxpc, base = 10)))
-lm_prbarr <- with(crime_na, lm(crmrte ~ prbarr))
-lm_prbconv <- with(crime_na, lm(crmrte ~ prbconv))
-lm_prbpris <- with(crime_na, lm(crmrte ~ prbpris))
-lm_avgsen <- with(crime_na, lm(crmrte ~ avgsen))
-lm_pctmin80 <- with(crime_na, lm(crmrte ~ pctmin80))
-lm_govtwg <- with(crime_na, lm(crmrte ~ govt_wg))
-lm_physicalwg <- with(crime_na, lm(crmrte ~ physical_wg))
-lm_industrywg <- with(crime_na, lm(crmrte ~ industry_wg))
-lm_ie <- with(crime_na, lm(crmrte ~ income_inequality_proxy))
-
-
-# Adding the AICs
-lm_polpc$AIC <- AIC(lm_polpc)
-lm_pctymle$AIC <- AIC(lm_pctymle)
-lm_density$AIC <- AIC(lm_density)
-lm_taxpc$AIC <- AIC(lm_taxpc)
-lm_prbarr$AIC <- AIC(lm_prbarr)
-lm_prbconv$AIC <- AIC(lm_prbconv)
-lm_prbpris$AIC <- AIC(lm_prbpris)
-lm_avgsen$AIC <- AIC(lm_avgsen)
-lm_pctmin80$AIC <- AIC(lm_pctmin80)
-lm_govtwg$AIC <- AIC(lm_govtwg)
-lm_physicalwg$AIC <- AIC(lm_physicalwg)
-lm_industrywg$AIC <- AIC(lm_industrywg)
-lm_ie$AIC <- AIC(lm_ie)
-```
-
-The below are our model results using only a single explanatory variable per model:
-
-```{r stargazer_simple_ols, results="asis"}
-# Code from here: https://stackoverflow.com/questions/47494761/show-akaike-criteria-in-stargazer (using the example 2 approach)
-stargazer(lm_polpc,lm_pctymle,lm_density,lm_taxpc,lm_prbarr,lm_prbconv,lm_prbpris,lm_avgsen,lm_pctmin80,
-          lm_govtwg,lm_physicalwg,lm_industrywg,lm_ie,
-          type = "latex", report="vc", header=FALSE,
-          title = "Linear Models Predicting Crime Rate",
-          keep.stat = c("aic", "rsq", "n"), omit.table.layout = "n",
-          column.sep.width = "0pt",
-          font.size = "tiny")
-
-```
-
-There are several very important findings we can deduce from our simple linear regressions.  First, there are several variables which have negligible explanatory power and can be excluded from our first model which is focused on parsimony.  We categorize these into three categories:
-
-Enforecement:
-
-  1) Probability Prison (prbpris) has an R squared value of .002 suggesting that an increase in incarcaration rates is not an effective deterrent of crime.  
-  
-  2) Average Sentence (avgsen) has an R squared value of .0004, which implies that average sentence length has essentially no predictive capability.
-  
-  The fact that these two variables have little explanaory power has far reaching consequences for our policy reccomendations.  If we accept these two models as causal, it would suggest that neither increasing prison sentences nor increasing sentencing rates has an influence on the crime rate.  In fact, the coefficients for both variables are positive, indicating that as   Therefore, any legislation which attempts to reduce crime through these mechanisms is likely to fail.
-  
-Environmental:
-
-  1) Income Inequality (income_inequality_proxy) has an R squared value of .003.  This suggests to us that at least our proxy for income inequality is not predictive of crime rates in NC during this time period.
-  
-
-Demographic:
-
-  1) Percent Minority in year 1980 (pctmin80) has an R squared value of .033 suggesting that in isolation crime rates are not linearly associated with minority populations.
-
-Note: While Police per capita has a low R squared value we will continue to include it as it is crucial to understand this variable in order to make informed policy decisions.
-  
-From our remaining variables there are two pairs which may be highly correlated.  We looked at probability of arrest, and probability of conviction, as well as Government wage and Industry wage.  
-
-``` {r model 1 pair comparison}
-lm_wagecompare <- with(crime_na, lm(crmrte ~ govt_wg+industry_wg))
-lm_enforcement <- with(crime_na, lm(crmrte ~ prbarr+prbconv))
-
-summary(lm_wagecompare)
-summary(lm_enforcement)
-```
-
-From the above we learn that when including both our govt_wg and industry_wg variables, the coefficient of industry_wg decreases significantly, while there is a much smaller change in the govt_wg coefficient.  Because of this, we will only include govt_wg in our first model.  
-
-When including both prbarr and prbconv our coefficients remain largely unchanged, and our adjusted R squared increases significantly.  Therefore we will continue to use both variables.
-
-After this initial round of analysis we decided to create our first model which uses Police per capaita, percent male, density, log of tax revenue per capita, probability of arrest, probability conviction, and government wage.
+Using the aforementioned criteria we choose the variables police per capita (polpc), probability of arrest (prbarr), probability of conviction (prbconv), probability of incarceration, and average sentence length for our first model.
 
 ``` {r model 1}
-model1 <- with(crime_na, lm(crmrte ~ polpc + pctymle + density+ log(taxpc, base = 10)+prbarr+prbconv+govt_wg))
+model1 <- with(crime_na, lm(crmrte ~ polpc+prbarr+prbconv+prbpris+avgsen))
+model1$AIC <- AIC(model1)
 summary(model1)
 ```
+
+Comments on Model 1:
+
+Police per capita, probability of arrest, and probability of conviction all have high levels of significance, and the overall model has an adjusted R squared of .5232.  There are three main points to highlight:
+
+  1) Our coefficient for police per capita (polpc) is positive, large, and highly significant. If we assume this model to be causal then the best mechanism for reducing crime rates would be to sunset the police force!  What is most likely happening is that police per capita is a response to criminal activity.  
+  
+  2) Both probability of arrest and probability of conviction have highly significant and negative coefficients.  This fits with what we would expect: The more likely an individual is to be caught and convicted the less likely they are to commit crime.
+  
+  3) Probability of incarceration and average sentence length are not statistically significant.  Furthermore, the coefficient for incarceration rate is positive, which is counterintuitive. 
+
+## Model 2
+
+
+While our first model showed promise there are a range of factors which might be correlated with these explantory variables leading to multicollinearity issues.  In order to control for this we created a second model which includes variables we believe to be highly correlated with our three key variables.
+
+Police Per Capita:  The police force is funded by taxpayers, and therefore we might expect higher levels of police to be correlated with higher levels of revenue.  Given the assumed diminishing marginal returns of money it makes sense to include the log transformation so that we can interpret our coefficient as the change given a 1% increase.  Additionally, we would expect policing patterns to be very different in the city vis a vis suburban or rural areas, and therefore including density can help control for this.
+
+Probability of Arrest: Outside research suggests that that men, and especially minority men are at an increased risk of being arrested.  Therefore we will include both the percent male and percent minority variables.
+
+Probability of Conviction:  This process involves lawyers, judges, police, and many other government officials.  This probability might be correlated to the overall quality of those departements which can be proxied by our government wage variable.
+
+Probability Incarceration and Average sentencing may also be correlated with the additional included variables, but there aren't any additional covariates we included on their behalf.
+
+  
+``` {r model 2}
+model2 <- with(crime_na, lm(crmrte ~ polpc+prbarr+prbconv+prbpris+avgsen+log(taxpc, base = 10)+density+govt_wg+pctymle+pctmin80))
+model2$AIC <- AIC(model1)
+summary(model2)
+```
+
+Notes on Model 2:
+
+
 
 ```{r lm_1}
 lm_mod1a <- with(crime_na, lm(crmrte ~ polpc + pctymle))
