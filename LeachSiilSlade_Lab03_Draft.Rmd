@@ -139,7 +139,6 @@ qq_prbarr_log <- with(crime_na, qqplot(log(prbarr), crmrte))
 dev.off()
 # knitr::include_graphics(c("qq_prbarr_base.png", "qq_prbarr_log.png"))
 ```
-
 ```{r trans_prbconv, out.width="50%", echo = FALSE, results = FALSE}
 png("qq_prbconv_base.png")
 qq_prbconv_base <- with(crime_na, qqplot(prbconv, crmrte))
@@ -432,7 +431,7 @@ The log of police per capita, the log of the probability of arrest, and the prob
 
 ## Model 2
 
-While our first model showed promise, there are several other factors which might be correlated with these explanatory variables; this would lead to multicollinearity issues.  When multiple independent variables exhibit collinearity it becomes increasingly difficult to untangle their individual effects on the crime rate, because they are related.  This is troublesome because the model coefficients  may misrepresent the impact of a variable, leading to a policy which has underwhelming impact.  In order to control for this we created a second model which includes variables we believe to be highly correlated with our three key variables.
+While our first model showed promise, there are several other factors which might be correlated with these explanatory variables; this would lead to multicollinearity issues.  When multiple independent variables exhibit collinearity it becomes increasingly difficult to untangle their individual effects on the crime rate.  This is troublesome because the model coefficients  may misrepresent the impact of a variable, leading to a policy which has underwhelming impact.  In order to control for this we created a second model which includes variables we believe to be highly correlated with our three key variables.
 
 \textbf{Collinearity with Police Per Capita}: We would expect policing practices in urban areas to differ substantially from those in suburban or rural areas; including density and the urban dummy variable can help control for this. Additionally, the police force is funded by taxpayers, and therefore we might expect a larger police force per capita to be correlated with higher tax revenues.  \textit{\color{red}{Given the assumed diminishing marginal returns of money}} \textbf{\color{red}{[TS: <- Could you unpack that a bit more, Clay?]}} it makes sense to include the log transformation so that we can interpret our coefficient as the change given a 1% increase.
 
@@ -443,6 +442,26 @@ Our dataset contains 9 wage variables, each representing a different sector or g
   1) Government Wage: Average of `wfed` (federal government wage), `wsta` (state government wage), and `wloc` (local government wage)
   2) Blue-Collar \textbf{\color{red}{[TS: <- Okay edit? Service industry not really physical labor in same way as manufacturing and construction...]}} Wage: Average of `wmfg` (manufacturing), `wser` (service), `wcon` (construction)
   3) Professional Wage: Average of `wfir` (Finance/Investment/Real Estate), `wtrd` (Wholesale/Retail Trade), and `wtuc` (Transportation, Utilities, Communication) \textbf{\color{red}{[TS: <- I'd advocate for grouping `wtuc` with blue-collar; maybe retail as well. It's likely generate incomes closer to the blue-collar range than the professional wage. That would leave wfir alone, so no need for a composite var...]}}
+
+```{r}
+crime_na %>% 
+  gather(wcon, wtuc, wtrd, wfir, wser, wmfg, wfed, wsta, wloc,  key = 'work_type', value = 'weekly_wage') %>%
+  select(county, work_type, weekly_wage, everything()) %>%
+  ggplot(aes(x = weekly_wage, fill = work_type)) +
+  #geom_histogram(position = 'dodge')
+  geom_density(alpha = 0.5) +
+  scale_color_brewer() +
+  xlim(0, 750)
+
+
+test <- crime_na %>% 
+  gather(wcon, wtuc, wtrd, wfir, wser, wmfg, wfed, wsta, wloc,  key = 'work_type', value = 'weekly_wage') %>%
+  select(county, work_type, weekly_wage) %>%
+  group_by(work_type) %>%
+  summarise(ave_weekly_wage = mean(weekly_wage)) %>%
+  arrange(desc(ave_weekly_wage)) %>%
+  select(1)
+```
 
 ``` {r new_variable_creation}
 crime_na$govt_wg <- (crime_na$wfed+crime_na$wsta+crime_na$wloc)/3
@@ -619,6 +638,31 @@ for (v in mod2vars){
 }
 ```
 
+```{r make_scatter}
+make_scatters <- function(df, var_list, y, trans) {
+  
+  if(!missing(trans)) {
+    var_list <- append(var_list, str_glue('{trans}({var_list})'))
+  }
+
+  for (v in var_list){
+  print(ggplot(df, aes_string(x = v, y = y)) +
+          geom_point() + 
+          geom_smooth(method = 'lm', se = FALSE) +
+          xlab(v) +
+          ylab(y) +
+          ggtitle(str_glue('{y} vs {v}'))
+        )
+    } 
+}
+
+
+make_scatters(crime_na, mod1vars, y = 'crmrte')
+
+
+```
+
+
 ``` {r mod_4transforms}
 #Linear model retaining only significant variables from mod_2
 model3_trans <- with(crime_na, lm(crmrte ~ log(polpc) + prbarr + prbconv + prbpris^2 +
@@ -630,5 +674,5 @@ model3_trans <- with(crime_na, lm(crmrte ~ log(polpc) + prbarr + prbconv + prbpr
 model3_trans$AIC <- AIC(model3_trans)
 
 #Output model results in nice format using tidy and kable
-kable(tidy(model3_trans))
+kable(tidy(model3_trans) %>% select(-std.error))
 ```
