@@ -148,27 +148,46 @@ for (i in 1:length(colnames(crime_na))){
 
 Reviewing these graphs yields five (5) variables which appear to have a non-linear relationship with crime rate: Probability of arrest(prbarr), probability of conviction (prbconv), police per capita (polpc), density (density), and tax revenue per capita (taxpc).  Four of the variables appear to benefit from a log transform, while the fifth (density) appear to be related to crime rate via the square root function.  In addition to checking whether the relationship appeared to improve in linearity, we also checked whether this transformation helped with variable skew.  In every case the distribution of our variable moved closer to normality. Given the improvement in linearity and normality we will use these transformations moving forward.
 
+Linearity Graphs:
 ``` {r linearity testing}
-#Skew under transformation
-qqnorm(log(crime_na$prbarr))
-qqnorm(log(crime_na$prbconv))
-qqnorm(log(crime_na$polpc))
-qqnorm(sqrt(crime_na$density))
-qqnorm(log(crime_na$taxpc))
 
-#Relationship to crime rate without transformation
+#Relationship to crime rate with and without transformation
 plot(crime_na$prbarr,crime_na$crmrte)
-plot(crime_na$prbconv,crime_na$crmrte)
-plot(crime_na$polpc,crime_na$crmrte)
-plot(crime_na$density,crime_na$crmrte)
-plot(crime_na$taxpc,crime_na$crmrte)
-
-#Relationship following transformation
 plot(log(crime_na$prbarr),crime_na$crmrte)
+
+plot(crime_na$prbconv,crime_na$crmrte)
 plot(log(crime_na$prbconv),crime_na$crmrte)
+
+plot(crime_na$polpc,crime_na$crmrte)
 plot(log(crime_na$polpc),crime_na$crmrte)
+
+plot(crime_na$density,crime_na$crmrte)
 plot(sqrt(crime_na$density),crime_na$crmrte)
+
+plot(crime_na$taxpc,crime_na$crmrte)
 plot(log(crime_na$taxpc),crime_na$crmrte)
+
+```
+
+Normality/Skew With and Without Transformation:
+
+``` {r skewness graphs}
+
+#Normality/skew with and without transformations
+qqnorm(crime_na$prbarr)
+qqnorm(log(crime_na$prbarr))
+
+qqnorm(crime_na$prbconv)
+qqnorm(log(crime_na$prbconv))
+
+qqnorm(crime_na$polpc)
+qqnorm(log(crime_na$polpc))
+
+qqnorm(crime_na$density)
+qqnorm(sqrt(crime_na$density))
+
+qqnorm(crime_na$taxpc)
+qqnorm(log(crime_na$taxpc))
 ```
 
 
