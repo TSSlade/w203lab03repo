@@ -445,22 +445,19 @@ Our dataset contains 9 wage variables, each representing a different sector or g
 
 ```{r}
 crime_na %>% 
-  gather(wcon, wtuc, wtrd, wfir, wser, wmfg, wfed, wsta, wloc,  key = 'work_type', value = 'weekly_wage') %>%
+  gather(wfed, wtuc, wsta, wmfg, wfir, wloc, wcon, wser, wtrd, key = 'work_type',
+         value = 'weekly_wage') %>%
   select(county, work_type, weekly_wage, everything()) %>%
+  mutate(work_type = factor(work_type, c('wfed', 'wtuc', 'wsta', 'wmfg', 'wfir',
+                                         'wloc', 'wcon', 'wser', 'wtrd'))) %>%
   ggplot(aes(x = weekly_wage, fill = work_type)) +
-  #geom_histogram(position = 'dodge')
   geom_density(alpha = 0.5) +
-  scale_color_brewer() +
-  xlim(0, 750)
-
-
-test <- crime_na %>% 
-  gather(wcon, wtuc, wtrd, wfir, wser, wmfg, wfed, wsta, wloc,  key = 'work_type', value = 'weekly_wage') %>%
-  select(county, work_type, weekly_wage) %>%
-  group_by(work_type) %>%
-  summarise(ave_weekly_wage = mean(weekly_wage)) %>%
-  arrange(desc(ave_weekly_wage)) %>%
-  select(1)
+  scale_fill_brewer(palette = 'Spectral') +
+  ggtitle('Weekly Wage Density by position') +
+  xlab('Weekly Wage $/week') +
+  ylab('Density') +
+  labs(fill = 'Work type') +
+  xlim(0, 750) 
 ```
 
 ``` {r new_variable_creation}
