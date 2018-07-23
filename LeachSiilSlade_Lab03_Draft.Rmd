@@ -39,7 +39,6 @@ here::here() # TS: Use when all set up, so we can mask the output.
 #crime_raw <- read_csv('../crime_v2.csv', # TS: Commented out b/c using "here()" don't need ../
 crime_raw <- read_csv('crime_v2.csv', col_types = cols( prbconv = col_double()))
 problems(crime_raw) # TS: To comment out once we're ready to generate our draft report.
-crime_raw[97, ]
 ```
 
 ## Missing Values
@@ -380,7 +379,7 @@ We face a key limitation: our data does not give us visibility into crime, it on
 
 In order to answer our research question we created a model which included variables related to key crime policy decisions.  We only included variables which would allow our canadidate to make concrete policy proposals that lie within her purview.
 
-Using the aforementioned criteria we choose the variables police per capita (`polpc`), probability of arrest (`prbarr`), probability of conviction (`prbconv`), probability of incarceration (`prbpris`), and average sentence length (`avgsen`) for our first model.  Understanding how these items relate to crime rate can help shape her position, and understand whether a "Tough on Crime" stance does in fact acheive a reduction in crime.  Speciically, we can help her understand which departement/function should receive additional funding given a limited budget (e.g. if conviction rates are highly correlated perhaps we invest more in our District Attorneys).
+Using the aforementioned criteria we choose the variables police per capita (`polpc`), probability of arrest (`prbarr`), probability of conviction (`prbconv`), probability of incarceration (`prbpris`), and average sentence length (`avgsen`) for our first model.  Understanding how these items relate to crime rate can help shape her position, and understand whether a "Tough on Crime" stance does in fact acheive a reduction in crime.  Specifically, we can help her understand which departement/function should receive additional funding given a limited budget (e.g. if conviction rates are highly correlated perhaps we invest more in our District Attorneys).
 
 \begin{center} % https://community.rstudio.com/t/inserting-table-in-r-markdown/7260/4
 \captionof{table}{Model 1: Hypothesized Key Determinants of Observed Crime Rate}
@@ -404,18 +403,21 @@ model1 <- with(crime_na, lm(crmrte ~ polpc+prbarr+prbconv+prbpris+avgsen))
 model1$AIC <- AIC(model1)
 
 #Output model results in nice format using tidy and kable
-kable(tidy(model1))
+kable(tidy(model1) %>% select(-std.error))
 ```
 
 ``` {r mod1_transforms}
+
 #Linear Regression model using only our key variables of interest, transformed as needed
-model1_trans <- with(crime_na, lm(crmrte ~ log(polpc) + log(prbarr) + prbconv + prbpris^2 + avgsen))
+model1_trans <- with(crime_na, lm(crmrte ~ log(polpc) + log(prbarr) +
+                                    prbconv + prbpris^2 + avgsen))
 
 #Adding AIC to our model to help us compare models in the future.
 model1_trans$AIC <- AIC(model1_trans)
 
 #Output model results in nice format using tidy and kable
-kable(tidy(model1_trans))
+kable(tidy(model1_trans) %>% select(-std.error),
+      caption = 'Model 1: Hypothesized Key Determinants of Observed Crime Rate')
 ```
 
 **Comments on Model 1:**
@@ -430,7 +432,7 @@ The log of police per capita, the log of the probability of arrest, and the prob
 
 ## Model 2
 
-While our first model showed promise there are several other factors which might be correlated with these explanatory variables; this would lead to multicollinearity issues. \textbf{\color{red}{To-Do: add a sentence or two about why that's a problem.}} In order to control for this we created a second model which includes variables we believe to be highly correlated with our three key variables.
+While our first model showed promise, there are several other factors which might be correlated with these explanatory variables; this would lead to multicollinearity issues.  When multiple independent variables exhibit collinearity it becomes increasingly difficult to untangle their individual effects on the crime rate, because they are related.  This is troublesome because the model coefficients  may misrepresent the impact of a variable, leading to a policy which has underwhelming impact.  In order to control for this we created a second model which includes variables we believe to be highly correlated with our three key variables.
 
 \textbf{Collinearity with Police Per Capita}: We would expect policing practices in urban areas to differ substantially from those in suburban or rural areas; including density and the urban dummy variable can help control for this. Additionally, the police force is funded by taxpayers, and therefore we might expect a larger police force per capita to be correlated with higher tax revenues.  \textit{\color{red}{Given the assumed diminishing marginal returns of money}} \textbf{\color{red}{[TS: <- Could you unpack that a bit more, Clay?]}} it makes sense to include the log transformation so that we can interpret our coefficient as the change given a 1% increase.
 
