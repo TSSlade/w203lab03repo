@@ -38,9 +38,9 @@ Our client is running for office in the state of North Carolina (NC). Her campai
 #here::dr_here() # TS: Use on first run to see why it fails on your machine, if it does.
 here::here() # TS: Use when all set up, so we can mask the output.
 #crime_raw <- read_csv('../crime_v2.csv', # TS: Commented out b/c using "here()" don't need ../
-crime_raw <- read_csv('crime_v2.csv', col_types = cols( prbconv = col_double()))
-problems(crime_raw) # TS: To comment out once we're ready to generate our draft report.
-crime_raw[97, ]
+crime_raw <- read_csv('crime_v2.csv', col_types = cols(prbconv = col_double()))
+#problems(crime_raw) # TS: To comment out once we're ready to generate our draft report.
+#crime_raw[97, ]
 ```
 
 ## Missing Values
@@ -63,7 +63,7 @@ crime_na %>% summary() # TS: I think we'll want to suppress this snippet in the 
 
 ```{r eda_find_dup_county}
 crime_na %>% count(county) %>% filter(n > 1) # county 193 is an exact duplicate 
-crime_na %>% filter(county == 193)
+#crime_na %>% filter(county == 193)
 ```
 
 Continuing our QC, we note that one of the counties' records has been duplicated exactly. We therefore drop the duplicate record from our dataset.
@@ -88,7 +88,11 @@ Per the notes accompanying our data, _The probability of conviction is proxied b
 
 The notes on `prbarr` indicate _the probability of arrest is proxied by the ratio of arrests to offenses..._. If multiple suspects are arrested for a single offense, and this happens more frequently than offenses which do not lead to arrests, `prbarr` would indeed exceed 1.
 
-In both cases, there are plausible explanations for the values we observe. Therefore we will not drop these records from our dataset. We will, however, subject them to further scrutiny.
+In both cases, there are plausible explanations for a probability value in excess of 1, however,one of the observations does appear to be an  true outlier: The county labeled `115` has the lowest crime rate by far (~50\% lower than that of any other county), the highest `probability' of arrest (>1 arrest per offense, nearly 58% greater than the county with the second-highest probability), the longest average sentence (20.7 days, ~15\% higher than the second-longest), and the largest number of police per capita (9 officers per 1,000 residents, more than twice as many as the second-highest county). While those numbers appear unusual, they are internally consistent: one would expect a very low crime rate from a county that has a very strong police presence, arrests a large proportion of suspects, and punishes convicted criminals severely. \textbf{\color{red}{However, given the extreme values across the board we will exclude this data point, as we do not believe it to be representative of the overall generative process.}}
+
+``` {r remove_outlier}
+crime_na <- crime_na[crime_na$prbarr<=1,]
+```
 
 ```{r eda_plausibility_checks, echo = FALSE, results = "hide", fig.show = "hide"}
 plot(density(crime_na$year)) # TS: Confirmed all 1987
@@ -115,9 +119,7 @@ plot(density(crime_na$wloc))
 plot(density(crime_na$mix))
 ```
 
-Examining the remainder of our data, we found no substantial evidence of _top-coded_ or _bottom-coded_ (i.e., truncated) variables which might bias our regression models. However, there is an extreme outlier in `wser`, the variable indicating the county's weekly wage in the service industry.  To determine if this is valid we looked at the wage values for other sectors of the economy and did not see elevated values.  It is improbable, but not impossible, that individuals in the service industry are making 5-10x more than anyone else in the county, and therefore should subject this observation to further scrutiny.
-
-One of the observations, however, appears to be an outlier for some of our variables of interest. The county labeled `115` has the lowest crime rate by far (~50\% lower than that of any other county), the highest `probability' of arrest (>1 arrest per offense, nearly 58% greater than the county with the second-highest probability), the longest average sentence (20.7 days, ~15\% higher than the second-longest), and the largest number of police per capita (9 officers per 1,000 residents, more than twice as many as the second-highest county). While those numbers appear unusual, they are internally consistent: one would expect a very low crime rate from a county that has a very strong police presence, arrests a large proportion of suspects, and punishes convicted criminals severely. \textbf{\color{red}{We will test the robustness of our models by verifying how they change if this observation is retained instead of being treated as an outlier.}}
+Examining the remainder of our data, we found no substantial evidence of _top-coded_ or _bottom-coded_ (i.e., truncated) variables which might bias our regression models. However, there is an extreme outlier in `wser`, the variable indicating the county's weekly wage in the service industry.  To determine if this is valid we looked at the wage values for other sectors of the economy and did not see elevated values.  It is improbable, but not impossible, that individuals in the service industry are making significantly more than anyone else in the county.  We believe this data point should be scrutinized further before a determination is made to modify it.
 
 ## Transformation Analysis
 
@@ -131,6 +133,7 @@ for (i in 1:length(colnames(crime_na))){
   qqnorm(eval(parse(text=column_interest)),main=colnames(crime_na)[i])
 }
 ```
+
 From our graphs we saw that probability of arrest (prbarr), probability of conviction (prbconv), police per capita (polpc), tax revenue per capita (taxpc), density (density),percent young male (pctymle), and mix (mix) deviated from normality.  We will consider this in addition to other factors when deciding if a transformation would be beneficial.  
 
 Secondly, while not a perfect approach due to the possible interactions amongst variables, we also wanted to look at whether there is any obvious non-linearity  when looking at crime rate and each variable independently.  To do this we looked at a scatterplot of crime rate vs. each variable.
@@ -142,6 +145,7 @@ for (i in 1:length(colnames(crime_na))){
        ylab="Crime Rate",xlab=colnames(crime_na)[i])
 }
 ```
+
 Reviewing these graphs yields five (5) variables which appear to have a non-linear relationship with crime rate: Probability of arrest(prbarr), probability of conviction (prbconv), police per capita (polpc), density (density), and tax revenue per capita (taxpc).  Four of the variables appear to benefit from a log transform, while the fifth (density) appear to be related to crime rate via the square root function.  In addition to checking whether the relationship appeared to improve in linearity, we also checked whether this transformation helped with variable skew.  In every case the distribution of our variable moved closer to normality. Given the improvement in linearity and normality we will use these transformations moving forward.
 
 ``` {r linearity testing}
@@ -166,7 +170,6 @@ plot(log(crime_na$polpc),crime_na$crmrte)
 plot(sqrt(crime_na$density),crime_na$crmrte)
 plot(log(crime_na$taxpc),crime_na$crmrte)
 ```
-
 
 
 ## Variables Available for Analysis
@@ -281,7 +284,7 @@ kable(tidy(model1_trans))
 
 **Comments on Model 1:**
 
-The log of police per capita, the log of the probability of arrest, and the log of probability of conviction all have high levels of significance. The overall model has an adjusted $R^2$ of 0.495.  There are three main points to highlight:
+The log of police per capita, the log of the probability of arrest, and the log of probability of conviction all have high levels of significance. The overall model has an adjusted $R^2$ of 0.486.  There are three main points to highlight:
 
   1) Our coefficient for log police per capita (`polpc`) is positive, large, and highly significant. If we inaccurately assumed this model was causal the best mechanism to reduce crime rates would be to sunset the police force!  However, a more plausible interpretation is that a higher number of police per capita is a response to higher levels of criminal activity, rather than a cause of it.
   
