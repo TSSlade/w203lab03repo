@@ -323,7 +323,7 @@ kable(tidy(model1_trans))
 
 The log of police per capita, the log of the probability of arrest, and the log of probability of conviction all have high levels of significance. The overall model has an adjusted $R^2$ of 0.486.  There are three main points to highlight:
 
-  1) Our coefficient for log police per capita (`polpc`) is positive, large, and highly significant. If we inaccurately assumed this model was causal the best mechanism to reduce crime rates would be to sunset the police force!  However, a more plausible interpretation is that a higher number of police per capita is a response to higher levels of criminal activity, rather than a cause of it.
+  1) Our coefficient for log police per capita (`polpc`) is positive and highly significant. If we inaccurately assumed this model was causal the best mechanism to reduce crime rates would be to sunset the police force!  However, a more plausible interpretation is that a higher number of police per capita is a response to higher levels of criminal activity, rather than a cause of it.
   
   2) Both log probability of arrest (`prbarr`) and log probability of conviction (`prbconv`) have highly significant and negative coefficients.  This fits with what we would expect: the more likely an individual is to be caught and convicted the less likely they are to commit crime.
   
@@ -337,9 +337,10 @@ While our first model showed promise there are several other factors which might
 
 ### Creation of New Variables To Simplify Wage Metrics
 
-Our dataset contains 9 wage variables, each representing a different sector or group of industries.  We do not have \textit{a priori} justification to believe \textit{a single industry} \textbf{\color{red}{[TS: <- This feels a bit awk; to wordsmith...]}} might contribute disproportionately to crime, but we can assume that low wages in general might create an environment of economic scarcity in which crime incidence would increases.  Including all 9 variables when our dataset only contains 90 observations would be extremely limiting, \textbf{\color{red}{[TS: <- Poss. to add a phrase explaining why?]}} but excluding them entirely prohibits us from understanding how microeconomic conditions may be contributing to observed crime rates.  Researching the composition of each county's economy and weighting each variable accordingly might be a fruitful strategy, but it lies outside the scope of this report.  The solution we ultimately implemented was to create three new composite variables:
+Our dataset contains 9 wage variables, each representing a different sector or group of industries.  We do not have \textit{a priori} justification to believe \textit{a single industry} might contribute disproportionately to crime, but we can assume that low wages in general might create an environment of economic scarcity in which crime incidence would increases.  Including all 9 variables when our dataset only contains 90 observations would be extremely limiting, but excluding them entirely prohibits us from understanding how microeconomic conditions may be contributing to observed crime rates.  Researching the composition of each county's economy and weighting each variable accordingly might be a fruitful strategy, but it lies outside the scope of this report.  The solution we ultimately implemented was to create three new composite variables:
 
   1) Government Wage: Average of `wfed` (federal government wage), `wsta` (state government wage), and `wloc` (local government wage)
+<<<<<<< HEAD
   2) Blue-Collar \textbf{\color{red}{[TS: <- Okay edit? Service industry not really physical labor in same way as manufacturing and construction...]}} Wage: Average of `wmfg` (manufacturing), `wser` (service), `wcon` (construction)
   3) Professional Wage: Average of `wfir` (Finance/Investment/Real Estate), `wtrd` (Wholesale/Retail Trade), and `wtuc` (Transportation, Utilities, Communication) \textbf{\color{red}{[TS: <- I'd advocate for grouping `wtuc` with blue-collar; maybe retail as well. It's likely generate incomes closer to the blue-collar range than the professional wage. That would leave wfir alone, so no need for a composite var...]}}
 ```{r}
@@ -358,6 +359,10 @@ crime_na %>%
   labs(fill = 'Work type') +
   xlim(0, 750) 
 ```
+=======
+  2) Blue-Collar Wage: Average of `wmfg` (manufacturing), `wser` (service), `wcon` (construction)
+  3) Professional Wage: Average of `wfir` (Finance/Investment/Real Estate), `wtrd` (Wholesale/Retail Trade), and `wtuc` (Transportation, Utilities, Communication)
+>>>>>>> 1de30b0312f3bdb8765fa8da11fa7c8258c8b818
 
 ``` {r new_variable_creation}
 crime_na$govt_wg <- (crime_na$wfed+crime_na$wsta+crime_na$wloc)/3
@@ -430,7 +435,7 @@ kable(tidy(model2_trans))
 
 \textbf{Comments on Model 2}:
 
-1) One item of interest was the extreme degree of significance we see associated with our percent minority variable (`pctmin80`).  Interestingly, when using only this variable to predict crime rates our $R^2$ is very low; after controlling for other factors, however, this variable becomes extremely important. One way to measure this importance is by calculating the difference between the adjusted $R^2$ values for a model that includes the variable and one that excludes it. When including the minority variable in our model, the adjusted $R^2$ is `r round(summary(model2_trans)$adj.r.squared,3)`. When excluding it, the adjusted $R^2$ is `r round(summary(model2_trans_no_minvar)$adj.r.squared,3)`, a difference of `r added_adj_r_squared`
+1) One item of interest was the extreme degree of significance we see associated with our percent minority variable (`pctmin80`).  Interestingly, when using only this variable to predict crime rates our $R^2$ is very low; after controlling for other factors, however, this variable becomes extremely important. One way to measure this importance is by calculating the difference between the adjusted $R^2$ values for a model that includes the variable and one that excludes it. When including the minority variable in our model, the adjusted $R^2$ is `r round(summary(model2_trans)$adj.r.squared, 3)`. When excluding it, the adjusted $R^2$ is `r round(summary(model2_trans_no_minvar)$adj.r.squared, 3)`, a difference of `r round(added_adj_r_squared, 3)`
 
 
 2) The square root of the population density is also highly significant. Given the transformation the correct interpretation is that crime activity increases quickly when moving from very small to medium sized population densities, but requires increasingly large levels of population increase to have an effect on crime rate.  
@@ -470,7 +475,7 @@ Model 3 Notes:
 
 Similarly to model 2, we find that log police per capita, log probability of arrest, log probability of conviction, square root of density, and percent minority are significant.  While model 3 coefficients do change relative to model 2, there are not any drastic changes, or sign (+/-) changes indicating a reversal of effect.
 
-Our adjusted R squared value for this model is `r summary(model3_trans)$adj.r.squared` which does represent a slight, albeit negligible improvement over our previous model.
+Our adjusted R squared value for this model is `r round(summary(model3_trans)$adj.r.squared, 3)` which does represent a slight, albeit negligible improvement over our previous model.
 
 ## Model 4
 
@@ -490,22 +495,20 @@ kable(tidy(model4_trans))
 
 ## Model Comparison
 
-Below is a comparison table for our three models, along with key statistics related to the model.  Our findings match with what we would hope to see from a model building perspective: Our AIC and adjusted R squared numbers suggest that the model which includes both our key explanatory variables and plausible covariates performs the best.  Our model which excludes key covariates has significantly less predictive power (as measured by adjusted R squared), and our model which includes everything--despite having the highest unadjusted R squared--performed worse as we arbitrarily added additional variables.
+Below is a comparison table for our three initial models, as well as the fourth model that excluded all non-significant predictors. The table reports key statistics related to each model, including the coefficients for each predictor, the $R^2$ and adjusted $R^2$, and the \textit{Akaike information criterion}, or AIC. 
+
+Our findings match with what we would hope to see from a model building perspective: Our AIC and adjusted $R^2$ numbers suggest that of our three original models, \textit{Model 2} (which includes both our key explanatory variables and plausible covariates) performs the best. Our model which excludes key covariates has significantly less predictive power (as measured by adjusted $R^2$), and our model which includes everything--despite having the highest  $R^2$ values--performs slightly less well on the AIC (a measure of explanatory power and parsimony).
 
 ```{r stargazer, results = "asis"}
-# Code from here: https://stackoverflow.com/questions/47494761/show-akaike-criteria-in-stargazer (using the example 2 approach)
 stargazer(model1_trans, model2_trans, model3_trans, model4_trans,
           type = "latex", report="vc", header=FALSE,
           title = "Linear Models Predicting Crime Rate",
           keep.stat = c("aic", "rsq","adj.rsq","n"), omit.table.layout = "n")
 ```
 
-
-
 ## Omitted Variables
 
 Despite the promising results from our three models it is difficult to ascribe causality to the variables of interest.  One issue with causal inference in general is ommitted variable bias, which can invalidate our ability to assume each explanatory variable is uncorrelated with the error term.  While there are infinite variables which exist, there are several which deserve commentary:
-
 
 1) Political Party in Control: Traditionally the issue of crime policy is a highly partisan issue, with each party having very different approaches to crime reduction.  All else being equal, we might expect police levels and average sentence lengths to be correlated with the party that is crafting legislation.  Assuming we construct our variable as a boolean indicator ("is_republican"), we might expect the coefficient for police per capita to diminish as we assume a priori that higher police levels are correlated with conservative crime policies.  We could include this data by appending public records to our dataset which would be more appropriate than trying to find some other variable to proxy.
 
@@ -518,11 +521,21 @@ Despite the promising results from our three models it is difficult to ascribe c
 5) Police Representation: A community's relationship with the police can vary drastically from place to place.  In recent years certain cities have had significant unrest, with a key element being a majority white police force existing in a largely minority community.  Similar to police methodology, we might expect very different rates of arrest and conviction depending on whether the community feels the police represent them and their interests.
 6)
 
-## Findings and Policy Recommendations
+## Conclusion: Findings and Policy Recommendations
 
-Unfortunately, we only have a single cross section of data at our disposal and therefore it is nearly impossible to determine whether our variables are causes or effects.  In reality it is most likely a combination of both, with changes in crime rate driving changes in policy, which in turn impact crime rates, ad infinitum.  Because our ability to conduct causal inference is restricted, it would be unwise to make specific policy reccomendations based on our model.  What 
+Unfortunately, we only have a single cross section of data at our disposal and therefore it is nearly impossible to determine whether our variables are causes or effects.  In reality it is most likely a combination of both, with changes in crime rate driving changes in policy, which in turn impact crime rates, ad infinitum.  Because our ability to conduct causal inference is restricted, it would be unwise to make specific policy reccomendations based on our model.
 
-## Conclusion
+We can recommend to our candidate that she advocate for increased investment in research that will investigate the relationships between crime rates and the following factors:
+
+1) The number of police per capita
+2) The likelihood that crimes, once reported, result in arrests
+3) The likelihood that arrests result in convictions
+4) The population density in a given area
+5) The demographic composition in a given area
+
+The relationships suggested by our models are intuitive: an increase in the number of police per capita and the population density in an area are associated with (predictive of, in our model) increases in the crime rate; increases in the probability of arrest and probability of conviction are associated with decreases in the crime rate. An increase in the percentage of minority residents is associated with an increase in the crime rate.
+
+Four of them are simple to interpret: a 1% increase in the number of police is associated with an increase in the crime rate of 11.1 crimes per 100,000 people. Increasing by 1% the probability that a crime report leads to an arrest is associated with a decrease in the crime rate of 15.9 crimes per 100,000 people; a similar increase in the probability of conviction is associated with a decrease in the crime rate of 10.2 crimes per 100,000 people. A 1% increase in the minority share of the population is associated with an increase of 3.8 crimes per 100,000 people. The relationship with the population density is more complex, however, and bears further investigation
 
 ```{r, results="hide",fig.show="hide"}
 mod1vars <- c("polpc","prbarr","prbconv","prbpris","avgsen")
