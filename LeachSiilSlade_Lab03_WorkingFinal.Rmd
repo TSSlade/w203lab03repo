@@ -14,6 +14,7 @@ header-includes:
 output: 
   pdf_document: 
     latex_engine: xelatex
+    #pandoc_args: "--pdf-engine-opt=-shell-escape"
 ---
 
 ```{r setup, include=FALSE}
@@ -33,30 +34,13 @@ Our client is running for office in the state of North Carolina (NC). Her campai
 
 # Initial Exploratory Data Analysis (EDA)
 
-```{r data_import, echo = FALSE, results = "hide", warning=FALSE}
+```{r data_import, echo = FALSE, results = "hide"}
 #here::dr_here() # TS: Use on first run to see why it fails on your machine, if it does.
 here::here() # TS: Use when all set up, so we can mask the output.
 #crime_raw <- read_csv('../crime_v2.csv', # TS: Commented out b/c using "here()" don't need ../
 crime_raw <- read_csv('crime_v2.csv', col_types = cols(prbconv = col_double()))
 #problems(crime_raw) # TS: To comment out once we're ready to generate our draft report.
 #crime_raw[97, ]
-make_scatters <- function(df, var_list, y, trans) {
-  
-  if(!missing(trans)) {
-    var_list <- append(var_list, str_glue('{trans}({var_list})'))
-  }
-
-  for (v in var_list){
-  print(ggplot(df, aes_string(x = v, y = y)) +
-          geom_point() + 
-          geom_smooth(method = 'lm', se = FALSE) +
-          xlab(v) +
-          ylab(y) +
-          ggtitle(str_glue('{y} vs {v}'))
-        )
-    } 
-}
-
 ```
 
 ## Missing Values
@@ -165,47 +149,45 @@ for (i in 1:length(colnames(crime_na))){
 Reviewing these graphs yields five (5) variables which appear to have a non-linear relationship with crime rate: Probability of arrest(prbarr), probability of conviction (prbconv), police per capita (polpc), density (density), and tax revenue per capita (taxpc).  Four of the variables appear to benefit from a log transform, while the fifth (density) appear to be related to crime rate via the square root function.  In addition to checking whether the relationship appeared to improve in linearity, we also checked whether this transformation helped with variable skew.  In every case the distribution of our variable moved closer to normality. Given the improvement in linearity and normality we will use these transformations moving forward.
 
 Linearity Graphs:
+``` {r linearity testing}
 
-```{r linearity1, out.width='50%', }
+#Relationship to crime rate with and without transformation
+plot(crime_na$prbarr,crime_na$crmrte)
+plot(log(crime_na$prbarr),crime_na$crmrte)
 
-make_scatters(df = crime_na, var_list = c('prbarr'), y = 'crmrte', trans = 'log')
-```
-```{r linearity2, out.width='50%'}
-make_scatters(df = crime_na, var_list = c('prbconv'), y = 'crmrte', trans = 'log')
-```
-```{r linearity3, out.width='50%'}
-make_scatters(df = crime_na, var_list = c('polpc'), y = 'crmrte', trans = 'log')
-```
-```{r linearity4, out.width='50%'}
-make_scatters(df = crime_na, var_list = c('density'), y = 'crmrte', trans = 'sqrt')
-```
-```{r linearity5, out.width='50%'}
-make_scatters(df = crime_na, var_list = c('taxpc'), y = 'crmrte', trans = 'log')
-```
+plot(crime_na$prbconv,crime_na$crmrte)
+plot(log(crime_na$prbconv),crime_na$crmrte)
 
+plot(crime_na$polpc,crime_na$crmrte)
+plot(log(crime_na$polpc),crime_na$crmrte)
+
+plot(crime_na$density,crime_na$crmrte)
+plot(sqrt(crime_na$density),crime_na$crmrte)
+
+plot(crime_na$taxpc,crime_na$crmrte)
+plot(log(crime_na$taxpc),crime_na$crmrte)
+
+```
 
 Normality/Skew With and Without Transformation:
 
-``` {r skewnessgraphs, out.width = '50%', results='hide', fig.keep='all'}
+``` {r skewness graphs}
+
 #Normality/skew with and without transformations
-print(c(qqnorm(crime_na$prbarr), qqnorm(log(crime_na$prbarr))))
+qqnorm(crime_na$prbarr)
+qqnorm(log(crime_na$prbarr))
 
-```
+qqnorm(crime_na$prbconv)
+qqnorm(log(crime_na$prbconv))
 
-```{r out.width = '50%', results='hide', fig.keep='all'}
-print(c(qqnorm(crime_na$prbconv), qqnorm(log(crime_na$prbconv))))
-```
+qqnorm(crime_na$polpc)
+qqnorm(log(crime_na$polpc))
 
-```{r out.width = '50%', results='hide', fig.keep='all'}
-print(c(qqnorm(crime_na$polpc), qqnorm(log(crime_na$polpc))))
-```
+qqnorm(crime_na$density)
+qqnorm(sqrt(crime_na$density))
 
-```{r out.width = '50%', results='hide', fig.keep='all'}
-print(c(qqnorm(crime_na$density), qqnorm(sqrt(crime_na$density))))
-```
-
-```{r out.width = '50%', results='hide', fig.keep='all'}
-print(c(qqnorm(crime_na$taxpc), qqnorm(log(crime_na$taxpc))))
+qqnorm(crime_na$taxpc)
+qqnorm(log(crime_na$taxpc))
 ```
 
 
@@ -331,7 +313,7 @@ The log of police per capita, the log of the probability of arrest, and the log 
 
 ## Model 2
 
-While our first model showed promise there are several other factors which might be correlated with these explanatory variables; this would lead to multicollinearity issues.  When multiple independent variables exhibit collinearity it becomes increasingly difficult to untangle their individual effects on the crime rate.  This is troublesome because the model coefficients  may misrepresent the impact of a variable, leading to a policy which has underwhelming impact.  In order to avoid biased coefficient estimates, and to improve upon our model we created second model which includes variables we believe to be highly correlated with our three key variables.
+While our first model showed promise there are several other factors which might be correlated with these explanatory variables; this would lead to multicollinearity issues.  In order to avoid biased coefficient estimates, and to improve upon our model we created second model which includes variables we believe to be highly correlated with our three key variables.
 
 \textbf{Collinearity with Police Per Capita}: We would expect policing practices in urban areas to differ substantially from those in suburban or rural areas; including density can help control for this. Additionally, the police force is funded by taxpayers, and therefore we might expect a larger police force per capita to be correlated with higher tax revenues.
 
@@ -340,29 +322,8 @@ While our first model showed promise there are several other factors which might
 Our dataset contains 9 wage variables, each representing a different sector or group of industries.  We do not have \textit{a priori} justification to believe \textit{a single industry} might contribute disproportionately to crime, but we can assume that low wages in general might create an environment of economic scarcity in which crime incidence would increases.  Including all 9 variables when our dataset only contains 90 observations would be extremely limiting, but excluding them entirely prohibits us from understanding how microeconomic conditions may be contributing to observed crime rates.  Researching the composition of each county's economy and weighting each variable accordingly might be a fruitful strategy, but it lies outside the scope of this report.  The solution we ultimately implemented was to create three new composite variables:
 
   1) Government Wage: Average of `wfed` (federal government wage), `wsta` (state government wage), and `wloc` (local government wage)
-<<<<<<< HEAD
-  2) Blue-Collar \textbf{\color{red}{[TS: <- Okay edit? Service industry not really physical labor in same way as manufacturing and construction...]}} Wage: Average of `wmfg` (manufacturing), `wser` (service), `wcon` (construction)
-  3) Professional Wage: Average of `wfir` (Finance/Investment/Real Estate), `wtrd` (Wholesale/Retail Trade), and `wtuc` (Transportation, Utilities, Communication) \textbf{\color{red}{[TS: <- I'd advocate for grouping `wtuc` with blue-collar; maybe retail as well. It's likely generate incomes closer to the blue-collar range than the professional wage. That would leave wfir alone, so no need for a composite var...]}}
-```{r}
-crime_na %>% 
-  gather(wfed, wtuc, wsta, wmfg, wfir, wloc, wcon, wser, wtrd, key = 'work_type',
-         value = 'weekly_wage') %>%
-  select(county, work_type, weekly_wage, everything()) %>%
-  mutate(work_type = factor(work_type, c('wfed', 'wtuc', 'wsta', 'wmfg', 'wfir',
-                                         'wloc', 'wcon', 'wser', 'wtrd'))) %>%
-  ggplot(aes(x = weekly_wage, fill = work_type)) +
-  geom_density(alpha = 0.5) +
-  scale_fill_brewer(palette = 'Spectral') +
-  ggtitle('Weekly Wage Density by position') +
-  xlab('Weekly Wage $/week') +
-  ylab('Density') +
-  labs(fill = 'Work type') +
-  xlim(0, 750) 
-```
-=======
   2) Blue-Collar Wage: Average of `wmfg` (manufacturing), `wser` (service), `wcon` (construction)
   3) Professional Wage: Average of `wfir` (Finance/Investment/Real Estate), `wtrd` (Wholesale/Retail Trade), and `wtuc` (Transportation, Utilities, Communication)
->>>>>>> 1de30b0312f3bdb8765fa8da11fa7c8258c8b818
 
 ``` {r new_variable_creation}
 crime_na$govt_wg <- (crime_na$wfed+crime_na$wsta+crime_na$wloc)/3
