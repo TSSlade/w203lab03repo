@@ -25,6 +25,7 @@ library(here) # TS: Added this to handle the user-agnostic run.
 library(car)
 library(stargazer)
 library(broom)
+library(gridExtra)
 ```
 
 # Introduction
@@ -37,8 +38,9 @@ Our client is running for office in the state of North Carolina (NC). Her campai
 #here::dr_here() # TS: Use on first run to see why it fails on your machine, if it does.
 here::here() # TS: Use when all set up, so we can mask the output.
 #crime_raw <- read_csv('../crime_v2.csv', # TS: Commented out b/c using "here()" don't need ../
-crime_raw <- read_csv('crime_v2.csv', col_types = cols( prbconv = col_double()))
-problems(crime_raw) # TS: To comment out once we're ready to generate our draft report.
+crime_raw <- read_csv('crime_v2.csv', col_types = cols(prbconv = col_double()))
+#problems(crime_raw) # TS: To comment out once we're ready to generate our draft report.
+#crime_raw[97, ]
 ```
 
 ## Missing Values
@@ -61,7 +63,7 @@ crime_na %>% summary() # TS: I think we'll want to suppress this snippet in the 
 
 ```{r eda_find_dup_county}
 crime_na %>% count(county) %>% filter(n > 1) # county 193 is an exact duplicate 
-crime_na %>% filter(county == 193)
+#crime_na %>% filter(county == 193)
 ```
 
 Continuing our QC, we note that one of the counties' records has been duplicated exactly. We therefore drop the duplicate record from our dataset.
@@ -86,7 +88,11 @@ Per the notes accompanying our data, _The probability of conviction is proxied b
 
 The notes on `prbarr` indicate _the probability of arrest is proxied by the ratio of arrests to offenses..._. If multiple suspects are arrested for a single offense, and this happens more frequently than offenses which do not lead to arrests, `prbarr` would indeed exceed 1.
 
-In both cases, there are plausible explanations for the values we observe. Therefore we will not drop these records from our dataset. We will, however, subject them to further scrutiny.
+In both cases, there are plausible explanations for a probability value in excess of 1, however,one of the observations does appear to be an  true outlier: The county labeled `115` has the lowest crime rate by far (~50\% lower than that of any other county), the highest `probability' of arrest (>1 arrest per offense, nearly 58% greater than the county with the second-highest probability), the longest average sentence (20.7 days, ~15\% higher than the second-longest), and the largest number of police per capita (9 officers per 1,000 residents, more than twice as many as the second-highest county). While those numbers appear unusual, they are internally consistent: one would expect a very low crime rate from a county that has a very strong police presence, arrests a large proportion of suspects, and punishes convicted criminals severely. \textbf{\color{red}{However, given the extreme values across the board we will exclude this data point, as we do not believe it to be representative of the overall generative process.}}
+
+``` {r remove_outlier}
+crime_na <- crime_na[crime_na$prbarr<=1,]
+```
 
 ```{r eda_plausibility_checks, echo = FALSE, results = "hide", fig.show = "hide"}
 plot(density(crime_na$year)) # TS: Confirmed all 1987
@@ -113,200 +119,77 @@ plot(density(crime_na$wloc))
 plot(density(crime_na$mix))
 ```
 
-Examining the remainder of our data, we found no substantial evidence of _top-coded_ or _bottom-coded_ (i.e., truncated) variables which might bias our regression models. However, there is an extreme outlier in `wser`, the variable indicating the county's weekly wage in the service industry.  To determine if this is valid we looked at the wage values for other sectors of the economy and did not see elevated values.  It is improbable that individuals in the service industry are making 5-10x more than anyone else in the county, and therefore we will replace this value with an NA. 
-
---Talk about 1 row with probabiltiy of arrest, conviction, and police as outliers.
-
-One of the observations, however, appears to be an outlier for some of our variables of interest. The county labeled `115` has the lowest crime rate by far (~50\% lower than that of any other county), the highest `probability' of arrest (>1 arrest per offense, nearly 58% greater than the county with the second-highest probability), the longest average sentence (20.7 days, ~15\% higher than the second-longest), and the largest number of police per capita (9 officers per 1,000 residents, more than twice as many as the second-highest county). While those numbers appear unusual, they are internally consistent: one would expect a very low crime rate from a county that has a very strong police presence, arrests a large proportion of suspects, and punishes convicted criminals severely. \textbf{\color{red}{We will test the robustness of our models by verifying how they change if this observation is retained instead of being treated as an outlier.}}
+Examining the remainder of our data, we found no substantial evidence of _top-coded_ or _bottom-coded_ (i.e., truncated) variables which might bias our regression models. However, there is an extreme outlier in `wser`, the variable indicating the county's weekly wage in the service industry.  To determine if this is valid we looked at the wage values for other sectors of the economy and did not see elevated values.  It is improbable, but not impossible, that individuals in the service industry are making significantly more than anyone else in the county.  We believe this data point should be scrutinized further before a determination is made to modify it.
 
 ## Transformation Analysis
 
-If the relationship between two variables is not linear, adding them to a linear regression model as-is (without a transformation) will generate inaccurate results. It is therefore important to explore whether the relationship between two variables is logarithmic, exponential or otherwise and thus whether a transformation is required. As part of our EDA we explored this question for all of the variables in the dataset. For the sake of parsimony we discuss below only those variables which required a transformation.
+If the relationship between two variables is not linear, adding them to a linear regression model as-is (without a transformation) will generate inaccurate results and possibly result in an invalidation of our heteroskedsticity assumption. It is therefore important to explore whether the relationship between two variables shares some non-linear relationship and thus whether a transformation is required.   As part of our EDA we explored this question for all of the variables in the dataset.
 
-\[
-% The qq-plot of `prbarr` vs. `crmrte` suggests that a transformation may be required to account for variability in the tails. A `log()` transformation appears to reduce some of the variability.
-\]
+Our first step was to evaluate if any variables had signficant skew in their distributions by checking whether they generally conformed to a normal distribution using R's qqplot.  While this is not necessarily a reason to transform a variable, it can help us identify variables of interest.
 
-\textbf{\color{red}{--Evaluate the scatter of each of the 5 variables to see if a transform is necessary.
---Final table with new transforms.  
-  Police should be log transformed.
-  probability of prison should be squared}}
-
-```{r trans_prbarr, out.width="50%", echo = FALSE, results = FALSE}
-png("qq_prbarr_base.png")
-qq_prbarr_base <- with(crime_na, qqplot(prbarr, crmrte))
-dev.off()
-png("qq_prbarr_log.png") # Slightly better than base. Transform.
-qq_prbarr_log <- with(crime_na, qqplot(log(prbarr), crmrte))
-dev.off()
-# knitr::include_graphics(c("qq_prbarr_base.png", "qq_prbarr_log.png"))
-```
-```{r trans_prbconv, out.width="50%", echo = FALSE, results = FALSE}
-png("qq_prbconv_base.png")
-qq_prbconv_base <- with(crime_na, qqplot(prbconv, crmrte))
-dev.off()
-# png("qq_prbconv_log.png") # Less good than base. No transform.
-# qq_prbconv_log <- with(crime_na, qqplot(log(prbconv), crmrte))
-# dev.off()
-# knitr::include_graphics(c("qq_prbconv_base.png", "qq_prbconv_log.png"))
+``` {r skewed_variables, echo=FALSE, results="hide", fig.show = "hide"}
+for (i in 1:length(colnames(crime_na))){
+  column_interest <- paste("crime_na$",colnames(crime_na)[i],sep='')
+  qqnorm(eval(parse(text=column_interest)),main=colnames(crime_na)[i])
+}
 ```
 
-As can be seen below, the q-q plot of `prbpris` and `crmrte` appears to display some curvature, suggesting a parabola. Transforming the `prbpris` variable by squaring it appears to account for some of that curvature, so we will apply that transformation before including it in our models.
+From our graphs we saw that probability of arrest (prbarr), probability of conviction (prbconv), police per capita (polpc), tax revenue per capita (taxpc), density (density),percent young male (pctymle), and mix (mix) deviated from normality.  We will consider this in addition to other factors when deciding if a transformation would be beneficial.  
 
-```{r trans_prbpris, echo = FALSE, results = FALSE}
-png("qq_prbpris_base.png")
-qq_prbpris_base <- with(crime_na, qqplot(prbpris, crmrte),
-                main = "Q-Q Plot, Probability of Incarceration vs. Crime Rate",
-                xlab = "Probability of Incarceration",
-                ylab = "Crime Rate")
-dev.off()
-# png("qq_prbpris_log.png") # Less good than base. Consider sq
-# qq_prbpris_log <- with(crime_na, qqplot(log(prbpris), crmrte))
-# dev.off()
-png("qq_prbpris_sq.png") # Better than base. Transform.
-qq_prbpris_sq <- with(crime_na, qqplot(prbpris^2, crmrte),
-                main = "Q-Q Plot, Probability of Incarceration^2 vs. Crime Rate",
-                xlab = "Probability of Incarceration^2",
-                ylab = "Crime Rate")
-dev.off()
+Secondly, while not a perfect approach due to the possible interactions amongst variables, we also wanted to look at whether there is any obvious non-linearity  when looking at crime rate and each variable independently.  To do this we looked at a scatterplot of crime rate vs. each variable.
+
+``` {r relationship_of_interest, echo=FALSE, resulst="hide", fig.show = "hide"}
+for (i in 1:length(colnames(crime_na))){
+  column_interest <- paste("crime_na$",colnames(crime_na)[i],sep='')
+  plot(eval(parse(text=column_interest)),crime_na$crmrte,main=colnames(crime_na)[i],
+       ylab="Crime Rate",xlab=colnames(crime_na)[i])
+}
 ```
 
-```{r incl_qqprbpris, out.width="50%"}
-knitr::include_graphics(c("qq_prbpris_base.png", "qq_prbpris_sq.png"))
+Reviewing these graphs yields five (5) variables which appear to have a non-linear relationship with crime rate: Probability of arrest(prbarr), probability of conviction (prbconv), police per capita (polpc), density (density), and tax revenue per capita (taxpc).  Four of the variables appear to benefit from a log transform, while the fifth (density) appear to be related to crime rate via the square root function.  In addition to checking whether the relationship appeared to improve in linearity, we also checked whether this transformation helped with variable skew.  In every case the distribution of our variable moved closer to normality. Given the improvement in linearity and normality we will use these transformations moving forward.
+
+Linearity Graphs:
+``` {r linearity testing}
+
+#Relationship to crime rate with and without transformation
+plot(crime_na$prbarr,crime_na$crmrte)
+plot(log(crime_na$prbarr),crime_na$crmrte)
+
+plot(crime_na$prbconv,crime_na$crmrte)
+plot(log(crime_na$prbconv),crime_na$crmrte)
+
+plot(crime_na$polpc,crime_na$crmrte)
+plot(log(crime_na$polpc),crime_na$crmrte)
+
+plot(crime_na$density,crime_na$crmrte)
+plot(sqrt(crime_na$density),crime_na$crmrte)
+
+plot(crime_na$taxpc,crime_na$crmrte)
+plot(log(crime_na$taxpc),crime_na$crmrte)
+
 ```
 
+Normality/Skew With and Without Transformation:
 
-```{r trans_avgsen, echo = FALSE, results = FALSE}
-png("qq_avgsen_base.png")
-qq_avgsen_base <- with(crime_na, qqplot(avgsen, crmrte))
-dev.off()
-#png("qq_avgsen_log.png") # Doesn't look better. No transformation
-#qq_avgsen_log <- with(crime_na, qqplot(log(avgsen), crmrte))
-#dev.off()
+``` {r skewness graphs}
+
+#Normality/skew with and without transformations
+qqnorm(crime_na$prbarr)
+qqnorm(log(crime_na$prbarr))
+
+qqnorm(crime_na$prbconv)
+qqnorm(log(crime_na$prbconv))
+
+qqnorm(crime_na$polpc)
+qqnorm(log(crime_na$polpc))
+
+qqnorm(crime_na$density)
+qqnorm(sqrt(crime_na$density))
+
+qqnorm(crime_na$taxpc)
+qqnorm(log(crime_na$taxpc))
 ```
 
-The q-q plot of `polpc` and `crmrte` indicates that the distributions from which they were sampled deviate at higher values of `polpc`. A log transformation appears to improve the fit.
-
-```{r trans_polpc, echo = FALSE, results = FALSE}
-png("qq_polpc_base.png")
-qq_polpc_base <- with(crime_na, qqplot(polpc, crmrte),
-                main = "Q-Q Plot, Police per capita vs. Crime Rate",
-                xlab = "Police per capita",
-                ylab = "Crime Rate")
-dev.off()
-png("qq_polpc_log.png") # Better than base. Consider transform
-qq_polpc_log <- with(crime_na, qqplot(log(polpc), crmrte,
-                main = "Q-Q Plot, log(Police per capita) vs. Crime Rate",
-                xlab = "log(Police per capita)",
-                ylab = "Crime Rate"))
-dev.off()
-# png("qq_polpc_sq.png") # Less good than log
-# qq_polpc_sq <- with(crime_na, qqplot(polpc^2, crmrte))
-# dev.off()
-# png("qq_polpc_sqrt.png") # Less good than log
-# qq_polpc_sqrt <- with(crime_na, qqplot(sqrt(polpc), crmrte))
-# dev.off()
-# png("qq_polpc_log.png") # Not as good as log(polpc)
-# qq_polpc_log-log <- with(crime_na, qqplot(log(polpc), log(crmrte)))
-# dev.off()
-```
-
-```{r incl_polpc, out.width="50%"}
-knitr::include_graphics(c("qq_polpc_base.png", "qq_polpc_log.png"))
-```
-
-The q-q plot of tax revenue per capita and crime rate appears to be highly affected by the presence of an outlier. Applying a log transformation to the tax revenue variable improves the fit without requiring the outlier to be dropped. \textbf{\color{red}{Once we begin constructing models we will verify whether they are robust to retaining this outlier. [TS: <- To-do during cleanup / QC...]}}
-
-```{r trans_taxpc, echo = FALSE, results = FALSE}
-png("qq_taxpc_base.png")
-qq_taxpc_base <- with(crime_na, qqplot(taxpc, crmrte),
-                main = "Q-Q Plot, Tax Revenue per capita vs. Crime Rate",
-                xlab = "Ta Revenue per capita",
-                ylab = "Crime Rate")
-dev.off()
-png("qq_taxpc_log.png") # Better than base. Consider transform
-qq_taxpc_log <- with(crime_na, qqplot(log(taxpc), crmrte,
-                main = "Q-Q Plot, log(Tax Revenue per capita) vs. Crime Rate",
-                xlab = "log(Tax Revenue per capita)",
-                ylab = "Crime Rate"))
-dev.off()
-```
-
-```{r incl_taxpc, out.width="50%"}
-knitr::include_graphics(c("qq_taxpc_base.png", "qq_taxpc_log.png"))
-```
-
-\textbf{\color{red}{Discuss percent minority transformation here...GUYS: this is obviously the wrong transformation, but it's here as a placeholder. Take a look at the qq plot down at the end of the document. pctmin80 seems to have a clear sigmoid shape...what would be the right transformation there? Both log and square have been bad, so I'm thinking maybe we just don't transform at all? See below...}}
-
-```{r trans_pctmin80, echo = FALSE, results = FALSE}
-png("qq_pctmin80_base.png")
-qq_pctmin80_base <- with(crime_na, qqplot(pctmin80, crmrte),
-                main = "Q-Q Plot, Percent Minority in 1980 vs. Crime Rate",
-                xlab = "Percent Minority in 1980",
-                ylab = "Crime Rate")
-dev.off()
-png("qq_pctmin80_log.png") # Worse than base. Wrong transform
-qq_pctmin80_log <- with(crime_na, qqplot(log(pctmin80), crmrte,
-                main = "Q-Q Plot, Percent Minority in 1980 vs. Crime Rate",
-                xlab = "log(Percent Minority in 1980)",
-                ylab = "Crime Rate"))
-dev.off()
-png("qq_pctmin80_sq.png") # Better than base. Consider transform
-qq_pctmin80_sq <- with(crime_na, qqplot(pctmin80^2, crmrte,
-                main = "Q-Q Plot, (Percent Minority in 1980)^2 vs. Crime Rate",
-                xlab = "(Percent Minority in 1980)^2",
-                ylab = "Crime Rate"))
-dev.off()
-```
-
-```{r incl_pctmin80, out.width="50%"}
-knitr::include_graphics(c("qq_pctmin80_base.png", "qq_pctmin80_log.png"))
-knitr::include_graphics(c("qq_pctmin80_base.png", "qq_pctmin80_sq.png"))
-```
-
-The q-q plot of population density (persons per square mile) and crime rate appears to be an ill fit. Transforming the population density by taking the square appears to correct the misalignment, albeit with an outlier that appears to be very rural and have a low crime rate.
-
-\textbf{\color{red}{Guys: I'm not sure what the square root of persons per square mile means. Is this one where we forego the transformation because of the lack of interpretability? Also, I think the untransformed version seems to have more "outliers" than the square root version, but I'm def. not married to it.}}
-
-```{r trans_density, echo = FALSE, results = FALSE}
-png("qq_density_base.png")
-qq_density_base <- with(crime_na, qqplot(density, crmrte),
-                main = "Q-Q Plot, Percent Minority in 1980 vs. Crime Rate",
-                xlab = "Percent Minority in 1980",
-                ylab = "Crime Rate")
-dev.off()
-png("qq_density_sqrt.png") # Better than base. Consider transform
-qq_density_sqrt <- with(crime_na, qqplot(sqrt(density), crmrte,
-                main = "Q-Q Plot, Square Root of People per Square Mile vs. Crime Rate",
-                xlab = "Square Root of People per Square Mile",
-                ylab = "Crime Rate"))
-dev.off()
-```
-
-```{r incl_density, out.width="50%"}
-knitr::include_graphics(c("qq_density_base.png", "qq_density_sqrt.png"))
-```
-
-```{r trans_pctymle, echo = FALSE, results = FALSE}
-png("qq_pctymle_base.png")
-qq_pctymle_base <- with(crime_na, qqplot(pctymle, crmrte),
-                main = "Q-Q Plot, Percent Young Males vs. Crime Rate",
-                xlab = "Percent Young Males",
-                ylab = "Crime Rate")
-dev.off()
-png("qq_pctymle_log.png") # Better than base. But looks like it needs more
-qq_pctymle_log <- with(crime_na, qqplot(log(pctymle), crmrte,
-                main = "Q-Q Plot, Percent Young Male vs. Crime Rate",
-                xlab = "log(Percent Young Male)",
-                ylab = "Crime Rate"))
-dev.off()
-```
-
-The q-q plot of the percentage of young males and the crime rate appears to reveal a non-linear relationship. Applying a log transformation to the percent young male variable appears to improve the fit.
-
-```{r incl_pctymle, out.width="50%"}
-knitr::include_graphics(c("qq_pctymle_base.png", "qq_pctymle_log.png"))
-```
 
 ## Variables Available for Analysis
 
@@ -376,9 +259,9 @@ Variable Name & Description & Transformation Applied & Models Using \\ \hhline{|
 
 Our **research question** is the following: \textbf{\color{red}{Should our candidate support a traditional "Tough on Crime" platform?}}
 
-We face a key limitation: our data does not give us visibility into crime, it only gives us insight into the official _crime rate_. The crime rate is a function not only of crimes committed but also of various factors, some of which may be unobservable. For instance, poor community-police relations may bias crime rates downward if an area's residents \href{https://www.washingtonpost.com/news/acts-of-faith/wp/2018/04/19/churches-make-a-drastic-pledge-in-the-name-of-social-justice-to-stop-calling-the-police/?utm_term=.ac2ea8ee1523}{\textbf{\color{blue}{do not report all the crimes they observe or experience}}}. Conversely, those poor relations may also bias crime rates upward if police officers engage in \href{https://www.huffingtonpost.com/2015/05/04/st-louis-county-predatory-policing_n_7201964.html}{\textbf{\color{blue}{predatory policing practices}}} and the community lacks the wherewithal to fight back. As we report our findings we will make note of potential bias that results from our inability to observe and analyze critical variables.
+We face a key limitation: our data does not give us visibility into the crimes themselves or changes in crime, but rather provides only the official _crime rate_. The crime rate is a function not only of crimes committed but also of various factors, some of which may be unobservable. For instance, poor community-police relations may bias crime rates downward if an area's residents \href{https://www.washingtonpost.com/news/acts-of-faith/wp/2018/04/19/churches-make-a-drastic-pledge-in-the-name-of-social-justice-to-stop-calling-the-police/?utm_term=.ac2ea8ee1523}{\textbf{\color{blue}{do not report all the crimes they observe or experience}}}. Conversely, those poor relations may also bias crime rates upward if police officers engage in \href{https://www.huffingtonpost.com/2015/05/04/st-louis-county-predatory-policing_n_7201964.html}{\textbf{\color{blue}{predatory policing practices}}} and the community lacks the wherewithal to fight back.  A full discussion of omitted variable bias will occur later in this analysis.
 
-In order to answer our research question we created a model which included variables related to key crime policy decisions.  We only included variables which would allow our canadidate to make concrete policy proposals that lie within her purview.
+In order to answer our research question we created several models which included variables related to key crime policy decisions.  We only included variables which would allow our canadidate to make concrete policy proposals that lie within her purview.
 
 Using the aforementioned criteria we choose the variables police per capita (`polpc`), probability of arrest (`prbarr`), probability of conviction (`prbconv`), probability of incarceration (`prbpris`), and average sentence length (`avgsen`) for our first model.  Understanding how these items relate to crime rate can help shape her position, and understand whether a "Tough on Crime" stance does in fact acheive a reduction in crime.  Specifically, we can help her understand which departement/function should receive additional funding given a limited budget (e.g. if conviction rates are highly correlated perhaps we invest more in our District Attorneys).
 
@@ -396,16 +279,7 @@ Variable Name & Description & Transformation Applied \\ \hhline{|=|=|=|}
 \end{tabular}
 \end{center}
 
-
-## Transformation Analysis
-
---Evaluate the scatter of each of the 5 variables to see if a transform is necessary.
---Final table with new transforms.  
-  Police should be log transformed.
-  probability of prison should be squared
-
 ``` {r mod1_notransf, echo = FALSE, results = FALSE}
-
 #Linear Regression model using only our key variables of interest.
 model1 <- with(crime_na, lm(crmrte ~ polpc+prbarr+prbconv+prbpris+avgsen))
 
@@ -413,63 +287,43 @@ model1 <- with(crime_na, lm(crmrte ~ polpc+prbarr+prbconv+prbpris+avgsen))
 model1$AIC <- AIC(model1)
 
 #Output model results in nice format using tidy and kable
-kable(tidy(model1) %>% select(-std.error))
+kable(tidy(model1))
 ```
 
 ``` {r mod1_transforms}
-
 #Linear Regression model using only our key variables of interest, transformed as needed
-model1_trans <- with(crime_na, lm(crmrte ~ log(polpc) + log(prbarr) +
-                                    prbconv + prbpris^2 + avgsen))
+model1_trans <- with(crime_na, lm(crmrte ~ log(polpc)+log(prbarr)+log(prbconv)+prbpris+avgsen))
 
 #Adding AIC to our model to help us compare models in the future.
 model1_trans$AIC <- AIC(model1_trans)
 
 #Output model results in nice format using tidy and kable
-kable(tidy(model1_trans) %>% select(-std.error),
-      caption = 'Model 1: Hypothesized Key Determinants of Observed Crime Rate')
+kable(tidy(model1_trans))
 ```
 
 **Comments on Model 1:**
 
-The log of police per capita, the log of the probability of arrest, and the probability of conviction all have high levels of significance. The overall model has an adjusted $R^2$ of .5232.  There are three main points to highlight:
+The log of police per capita, the log of the probability of arrest, and the log of probability of conviction all have high levels of significance. The overall model has an adjusted $R^2$ of 0.486.  There are three main points to highlight:
 
-  1) Our coefficient for police per capita (`polpc`) is positive, large, and highly significant. If we inaccurately assumed this model was causal the best mechanism to reduce crime rates would be to sunset the police force!  This model is not causal, however, and a more plausible interpretation is that a higher number of police per capita is a response to higher levels of criminal activity. 
+  1) Our coefficient for log police per capita (`polpc`) is positive, large, and highly significant. If we inaccurately assumed this model was causal the best mechanism to reduce crime rates would be to sunset the police force!  However, a more plausible interpretation is that a higher number of police per capita is a response to higher levels of criminal activity, rather than a cause of it.
   
-  2) Both probability of arrest (`prbarr`) and probability of conviction (`prbconv`) have highly significant and negative coefficients.  This fits with what we would expect: the more likely an individual is to be caught and convicted the less likely they are to commit crime.
+  2) Both log probability of arrest (`prbarr`) and log probability of conviction (`prbconv`) have highly significant and negative coefficients.  This fits with what we would expect: the more likely an individual is to be caught and convicted the less likely they are to commit crime.
   
-  3) Neither the square of the probability of incarceration (`prbpris`) nor average sentence length (`avgsen`) were statistically significant.  Furthermore, the coefficient for the squared probability of incarceration rate is positive, which is counterintuitive. 
+  3) Neither the probability of incarceration of the average sentence length have high levels of significance.  Furthermore, the probability of prison has a positive coefficient, indicating that criminal activity increases are correlated with higher incarceration rates (ceteris perebus).  This is highly counterintuitive if we were to interpret this causally.
 
 ## Model 2
 
-While our first model showed promise, there are several other factors which might be correlated with these explanatory variables; this would lead to multicollinearity issues.  When multiple independent variables exhibit collinearity it becomes increasingly difficult to untangle their individual effects on the crime rate.  This is troublesome because the model coefficients  may misrepresent the impact of a variable, leading to a policy which has underwhelming impact.  In order to control for this we created a second model which includes variables we believe to be highly correlated with our three key variables.
+While our first model showed promise there are several other factors which might be correlated with these explanatory variables; this would lead to multicollinearity issues.  In order to avoid biased coefficient estimates, and to improve upon our model we created second model which includes variables we believe to be highly correlated with our three key variables.
 
-\textbf{Collinearity with Police Per Capita}: We would expect policing practices in urban areas to differ substantially from those in suburban or rural areas; including density and the urban dummy variable can help control for this. Additionally, the police force is funded by taxpayers, and therefore we might expect a larger police force per capita to be correlated with higher tax revenues.  \textit{\color{red}{Given the assumed diminishing marginal returns of money}} \textbf{\color{red}{[TS: <- Could you unpack that a bit more, Clay?]}} it makes sense to include the log transformation so that we can interpret our coefficient as the change given a 1% increase.
+\textbf{Collinearity with Police Per Capita}: We would expect policing practices in urban areas to differ substantially from those in suburban or rural areas; including density can help control for this. Additionally, the police force is funded by taxpayers, and therefore we might expect a larger police force per capita to be correlated with higher tax revenues.
 
-### Creation of variables to proxy tax revenue
+### Creation of New Variables To Simplify Wage Metrics
 
 Our dataset contains 9 wage variables, each representing a different sector or group of industries.  We do not have \textit{a priori} justification to believe \textit{a single industry} \textbf{\color{red}{[TS: <- This feels a bit awk; to wordsmith...]}} might contribute disproportionately to crime, but we can assume that low wages in general might create an environment of economic scarcity in which crime incidence would increases.  Including all 9 variables when our dataset only contains 90 observations would be extremely limiting, \textbf{\color{red}{[TS: <- Poss. to add a phrase explaining why?]}} but excluding them entirely prohibits us from understanding how microeconomic conditions may be contributing to observed crime rates.  Researching the composition of each county's economy and weighting each variable accordingly might be a fruitful strategy, but it lies outside the scope of this report.  The solution we ultimately implemented was to create three new composite variables:
 
   1) Government Wage: Average of `wfed` (federal government wage), `wsta` (state government wage), and `wloc` (local government wage)
   2) Blue-Collar \textbf{\color{red}{[TS: <- Okay edit? Service industry not really physical labor in same way as manufacturing and construction...]}} Wage: Average of `wmfg` (manufacturing), `wser` (service), `wcon` (construction)
   3) Professional Wage: Average of `wfir` (Finance/Investment/Real Estate), `wtrd` (Wholesale/Retail Trade), and `wtuc` (Transportation, Utilities, Communication) \textbf{\color{red}{[TS: <- I'd advocate for grouping `wtuc` with blue-collar; maybe retail as well. It's likely generate incomes closer to the blue-collar range than the professional wage. That would leave wfir alone, so no need for a composite var...]}}
-
-```{r}
-crime_na %>% 
-  gather(wfed, wtuc, wsta, wmfg, wfir, wloc, wcon, wser, wtrd, key = 'work_type',
-         value = 'weekly_wage') %>%
-  select(county, work_type, weekly_wage, everything()) %>%
-  mutate(work_type = factor(work_type, c('wfed', 'wtuc', 'wsta', 'wmfg', 'wfir',
-                                         'wloc', 'wcon', 'wser', 'wtrd'))) %>%
-  ggplot(aes(x = weekly_wage, fill = work_type)) +
-  geom_density(alpha = 0.5) +
-  scale_fill_brewer(palette = 'Spectral') +
-  ggtitle('Weekly Wage Density by position') +
-  xlab('Weekly Wage $/week') +
-  ylab('Density') +
-  labs(fill = 'Work type') +
-  xlim(0, 750) 
-```
 
 ``` {r new_variable_creation}
 crime_na$govt_wg <- (crime_na$wfed+crime_na$wsta+crime_na$wloc)/3
@@ -479,7 +333,7 @@ crime_na$industry_wg <- (crime_na$wfir+crime_na$wtrd+crime_na$wtuc)/3
 
 \textbf{Collinearity with Probability of Arrest}: Sociological research suggests that men - especially young, minority men - are at an increased risk of arrest.  Therefore we will include both the `pctymle` (percentage of young male, under a log transformation) and `pctmin80` (percentage of minorities in 1980) variables. 
 
-\textbf{Collinearity with Probability of Conviction}: The likelihood of an arrest leading to a conviction depends not only on the culpability of the suspect, but also on the quality or effectiveness of the police department's investigative team, the district attorney, court-appointed advocates, judges, and other government officials.  Quality is an unobservable (omitted) variable, but it  might be loosely correlated with the government wage. We will thus include our government wage variable as a proxy.
+\textbf{Collinearity with Probability of Conviction}: The likelihood of an arrest leading to a conviction depends not only on the culpability of the suspect, but also on the quality or effectiveness of the police department's investigative team, the district attorney, court-appointed advocates, judges, and other government officials.  Quality is an unobservable (omitted) variable, but it  might be loosely correlated with overall government wages. To proxy this we will include our government wage (govt_wg) variable.
 
 \textbf{Collinearity with Probability of Incarceration and Average Sentencing}: While there may be unobservable covariates for these two variables, we cannot identify any reasonable proxies to include in a revised model to address the issue.
 
@@ -520,15 +374,16 @@ model2$AIC <- AIC(model2)
 kable(tidy(model2))
 ```
 
+
 ``` {r mod_2transforms}
 #Model with our key explanatory variables, and what we suspect to be key covariates
-model2_trans <- with(crime_na, lm(crmrte ~ log(polpc) + prbarr + 
-                                  prbconv + prbpris + avgsen + log(taxpc) + sqrt(density) + 
-                                  govt_wg + log(pctymle) + pctmin80))
+model2_trans <- with(crime_na, lm(crmrte ~ log(polpc) + log(prbarr) + 
+                                  log(prbconv) + prbpris + avgsen + log(taxpc) + sqrt(density) + 
+                                  govt_wg + pctymle + pctmin80))
 
-model2_trans_no_minvar <- with(crime_na, lm(crmrte ~ polpc + prbarr +
-                                            prbconv + prbpris + avgsen + log(taxpc) +
-                                            sqrt(density) + govt_wg + log(pctymle)))
+model2_trans_no_minvar <- with(crime_na, lm(crmrte ~ log(polpc) + log(prbarr) + 
+                                  log(prbconv) + prbpris + avgsen + log(taxpc) + sqrt(density) + 
+                                  govt_wg + pctymle))
 
 added_adj_r_squared <- summary(model2_trans)$adj.r.squared - summary(model2_trans_no_minvar)$adj.r.squared
 
@@ -541,14 +396,10 @@ kable(tidy(model2_trans))
 
 \textbf{Comments on Model 2}:
 
-1) One item of interest was the extreme degree of significance we see associated with our percent minority variable (`pctmin80`).  Interestingly, when using only this variable to predict crime rates our $R^2$ is very low; after controlling for other factors, however, this variable becomes extremely important. One way to measure this importance is by calculating the difference between the adjusted $R^2$ values for a model that includes the variable and one that excludes it. When including the minority variable in our model, the adjusted $R^2$ is `r round(summary(model2_trans)$adj.r.squared,3)`. When excluding it, the adjusted $R^2$ is `r round(summary(model2_trans_no_minvar)$adj.r.squared,3)`, a difference of `r round((summary(model2_trans)$adj.r.squared-summary(model2_trans_no_minvar)$adj.r.squared),3)`
+1) One item of interest was the extreme degree of significance we see associated with our percent minority variable (`pctmin80`).  Interestingly, when using only this variable to predict crime rates our $R^2$ is very low; after controlling for other factors, however, this variable becomes extremely important. One way to measure this importance is by calculating the difference between the adjusted $R^2$ values for a model that includes the variable and one that excludes it. When including the minority variable in our model, the adjusted $R^2$ is `r round(summary(model2_trans)$adj.r.squared,3)`. When excluding it, the adjusted $R^2$ is `r round(summary(model2_trans_no_minvar)$adj.r.squared,3)`, a difference of `r added_adj_r_squared`
 
-``` {r minority_variable_addition, echo = FALSE, results = FALSE}
-# TS: Just did this in-line, above...could omit this chunk, unless we want to keep it to be transparent about how we derived the figures...
-cat("When including the minority variable our adjusted R squared is,",round(summary(model2)$adj.r.squared,3),"and when excluding this variable our adjusted R squared is,",round(summary(model2_no_minorityvariable)$adj.r.squared,3),",which equates to a delta of",round((summary(model2)$adj.r.squared-summary(model2_no_minorityvariable)$adj.r.squared),3))
-```
 
-2) The square root of the population density is also highly significant. However, it is unclear what the interpretation may be. Absent the square root transformation, the coefficient is ~.0055, indicating that an additional person per square mile increases the crime rate by .55%. \textbf{\color{red}{TS: Is that right? I'm not so sure about it...}}
+2) The square root of the population density is also highly significant. Given the transformation the correct interpretation is that crime activity increases quickly when moving from very small to medium sized population densities, but requires increasingly large levels of population increase to have an effect on crime rate.  
 
 ## Model 3
 
@@ -569,8 +420,8 @@ kable(tidy(model3))
 
 ``` {r mod_3transforms}
 #Linear model including our key explanatory variables, suspected covariates, and most other variables
-model3_trans <- with(crime_na, lm(crmrte ~ log(polpc) + prbarr + prbconv + prbpris^2 +
-                            avgsen + taxpc + sqrt(density) + govt_wg + log(pctymle) +
+model3_trans <- with(crime_na, lm(crmrte ~ log(polpc) + log(prbarr) + log(prbconv) + prbpris +
+                            avgsen + log(taxpc) + sqrt(density) + govt_wg + pctymle +
                             pctmin80 + west + central + urban +
                             physical_wg + industry_wg + mix))
 
@@ -583,19 +434,39 @@ kable(tidy(model3_trans))
 
 Model 3 Notes:
 
+Similarly to model 2, we find that log police per capita, log probability of arrest, log probability of conviction, square root of density, and percent minority are significant.  While model 3 coefficients do change relative to model 2, there are not any drastic changes, or sign (+/-) changes indicating a reversal of effect.
+
+Our adjusted R squared value for this model is `r summary(model3_trans)$adj.r.squared` which does represent a slight, albeit negligible improvement over our previous model.
+
+## Model 4
+
+One item we wished to investigate is whether we could build a more parsimonious model by selectively removing variables from our second model which did not appear to be significant.  Note: this is a form of model "dredging" and these results are for comparative purposes only.
+
+``` {r mod_4transforms}
+#Linear model including our key explanatory variables, suspected covariates, and most other variables
+model4_trans <- with(crime_na, lm(crmrte ~ log(polpc) + log(prbarr) + log(prbconv) +
+                                    sqrt(density) + pctmin80 ))
+
+#Adding AIC to our model to help us compare models in the future.
+model4_trans$AIC <- AIC(model4_trans)
+
+#Output model results in nice format using tidy and kable
+kable(tidy(model4_trans))
+```
+
 ## Model Comparison
 
 Below is a comparison table for our three models, along with key statistics related to the model.  Our findings match with what we would hope to see from a model building perspective: Our AIC and adjusted R squared numbers suggest that the model which includes both our key explanatory variables and plausible covariates performs the best.  Our model which excludes key covariates has significantly less predictive power (as measured by adjusted R squared), and our model which includes everything--despite having the highest unadjusted R squared--performed worse as we arbitrarily added additional variables.
 
 ```{r stargazer, results = "asis"}
 # Code from here: https://stackoverflow.com/questions/47494761/show-akaike-criteria-in-stargazer (using the example 2 approach)
-stargazer(model1, model2, model3,
+stargazer(model1_trans, model2_trans, model3_trans, model4_trans,
           type = "latex", report="vc", header=FALSE,
           title = "Linear Models Predicting Crime Rate",
           keep.stat = c("aic", "rsq","adj.rsq","n"), omit.table.layout = "n")
-
-
 ```
+
+
 
 ## Omitted Variables
 
@@ -608,18 +479,18 @@ Despite the promising results from our three models it is difficult to ascribe c
 
 3) Concentrated/Siloed Urban Blight: Our data is at the county level and therefore may obscure differences within the county.  We would expect there to be a difference in crime rates between a county which is relatively homogenous with respect to the variables, and one which has drastic differences (e.g. a very poor area and a very nice area).  One way to proxy this might be to calculate a normalized standard deviation of housing prices which could help capture if this phenomenom exists.  
 
-4) Policing Methodology:
+4) Policing Methodology: In recent years there has been a growing focus on "warrior" versus "guardian" mindsets in policing.  Depending on the type of methodology we might see very different rates of arrest and conviction.
 
-5) Police Representation: 
-
-
+5) Police Representation: A community's relationship with the police can vary drastically from place to place.  In recent years certain cities have had significant unrest, with a key element being a majority white police force existing in a largely minority community.  Similar to police methodology, we might expect very different rates of arrest and conviction depending on whether the community feels the police represent them and their interests.
 6)
 
 ## Findings and Policy Recommendations
 
+Unfortunately, we only have a single cross section of data at our disposal and therefore it is nearly impossible to determine whether our variables are causes or effects.  In reality it is most likely a combination of both, with changes in crime rate driving changes in policy, which in turn impact crime rates, ad infinitum.  Because our ability to conduct causal inference is restricted, it would be unwise to make specific policy reccomendations based on our model.  What 
+
 ## Conclusion
 
-```{r}
+```{r, results="hide",fig.show="hide"}
 mod1vars <- c("polpc","prbarr","prbconv","prbpris","avgsen")
 mod2vars <- c("taxpc","density","govt_wg","pctymle","pctmin80")
 mod3vars <- c("")
@@ -645,43 +516,4 @@ for (v in mod2vars){
           geom_qq(aes_string(sample = v)) +
             xlab(v))
 }
-```
-
-```{r make_scatter}
-make_scatters <- function(df, var_list, y, trans) {
-  
-  if(!missing(trans)) {
-    var_list <- append(var_list, str_glue('{trans}({var_list})'))
-  }
-
-  for (v in var_list){
-  print(ggplot(df, aes_string(x = v, y = y)) +
-          geom_point() + 
-          geom_smooth(method = 'lm', se = FALSE) +
-          xlab(v) +
-          ylab(y) +
-          ggtitle(str_glue('{y} vs {v}'))
-        )
-    } 
-}
-
-
-make_scatters(crime_na, mod1vars, y = 'crmrte')
-
-
-```
-
-
-``` {r mod_4transforms}
-#Linear model retaining only significant variables from mod_2
-model3_trans <- with(crime_na, lm(crmrte ~ log(polpc) + prbarr + prbconv + prbpris^2 +
-                            avgsen + taxpc + sqrt(density) + govt_wg + log(pctymle) +
-                            pctmin80 + west + central + urban +
-                            physical_wg + industry_wg + mix))
-
-#Adding AIC to our model to help us compare models in the future.
-model3_trans$AIC <- AIC(model3_trans)
-
-#Output model results in nice format using tidy and kable
-kable(tidy(model3_trans) %>% select(-std.error))
 ```
