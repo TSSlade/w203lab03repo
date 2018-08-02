@@ -54,8 +54,7 @@ names(crime_raw)
 The notes we receive provide the following insight into the variables:
 \begin{center} % https://community.rstudio.com/t/inserting-table-in-r-markdown/7260/4
 \captionof{table}{Available Variables from Cornwell \& Trumball (1994)}
-\begin{tabular}{|l|l|l|l|}
-\hline
+\begin{tabular}{l|l l l}
  \# & Variable Name & Type & Description \\ \hhline{|=|=|=|=|}
   1 & \texttt{county} & integer & \textit{Source county of data} \\
   2 & \texttt{year} & integer & \textit{Source year of data} \\
@@ -94,7 +93,7 @@ We find `r nrow(crime_raw %>% filter_all(any_vars(is.na(.))))` rows that are mis
 
 ```{r eda_drop_blank_rows}
 crime_na <- crime_raw %>% filter_all(any_vars(!is.na(.))) # Rows with no data
-crime_na %>% filter_all(any_vars(is.na(.))) %>% select(which(!is.na(.))) # Row with one back tick
+crime_na %>% filter_all(any_vars(is.na(.))) %>% select(which(!is.na(.))) # Formerly row with one back tick
 crime_na <- crime_na %>% filter_all(all_vars(!is.na(.))) # Verification
 ```
 
@@ -121,7 +120,7 @@ non_prob <- crime_na %>%
   filter(!between(prbarr, 0, 1) | !between(prbconv, 0, 1) | !between(prbpris, 0, 1))
 ```
 
-Examining the data, we find `r nrow(non_prob)` counties have values for the "probability" variables that are outside of the expected range. In each case, it is either `prbconv` (10 records) or `prbarr` (1 record) that fall outside the range.
+Examining the data^[See the \textit{Appendix} for the `non_prob` table], we find `r nrow(non_prob)` counties have values for the "probability" variables that are outside of the expected range. In each case, it is either `prbconv` (10 records) or `prbarr` (1 record) that fall outside the range.
 
 Per the notes accompanying our data, \textit{The probability of conviction is proxied by the ratio of convictions to arrests...} Given that definition, if not all suspects arrested are convicted, `prbconv` will be below 1. However, it may also exceed 1 if the number of exonerated suspects is exceeded by the number of suspects convicted of multiple charges. (See \href{https://www.michigancriminallawyer-blog.com/2014/08/this-blog-is-based-upon.html}{ \textbf{\color{blue}{here}}} for examples of multiple charges stemming from a single arrest.)
 
@@ -132,9 +131,6 @@ In both cases, there are plausible explanations for a probability value in exces
 ``` {r remove_outlier, include = FALSE}
 # crime_na <- crime_na[crime_na$prbarr<=1,] # TS: I have commented this out, as we now know the outlier makes sense.
 ```
-
-## Further Context
-
 
 ```{r eda_plausibility_checks, echo = FALSE, results = "hide", fig.show = "hide"}
 plot(density(crime_na$year)) # TS: Confirmed all 1987
@@ -165,9 +161,9 @@ Examining the remainder of our data, we found no substantial evidence of _top-co
 
 ## Transformation Analysis
 
-If the relationship between two variables is not linear, adding them to a linear regression model as-is (without a transformation) will generate inaccurate results and possibly result in an invalidation of our heteroskedsticity assumption. It is therefore important to explore whether the relationship between two variables shares some non-linear relationship and thus whether a transformation is required.   As part of our EDA we explored this question for all of the variables in the dataset.
+If the relationship between two variables is not linear, adding them to a linear regression model as-is (without a transformation) will generate inaccurate results and possibly result in an invalidation of our heteroskedasticity assumption. It is therefore important to explore whether the relationship between two variables shares some non-linear relationship and thus whether a transformation is required. As part of our EDA we explored this question for all of the variables in the dataset.
 
-Our first step was to evaluate if any variables had signficant skew in their distributions by checking whether they generally conformed to a normal distribution using R's qqplot.  While this is not necessarily a reason to transform a variable, it can help us identify variables of interest.
+Our first step was to evaluate if any variables had significant skew in their distributions by checking whether they generally conformed to a normal distribution using R's qqplot.  While this is not necessarily a reason to transform a variable, it can help us identify variables of interest.
 
 ``` {r skewed_variables, echo=FALSE, results="hide", fig.show = "hide"}
 for (i in 1:length(colnames(crime_na))){
@@ -567,3 +563,11 @@ for (v in mod2vars){
             xlab(v))
 }
 ```
+
+# Appendix
+
+Detail: observations in which the `probability' variables did not behave as probabilities insofar as they fell outside the range of 0:1.
+```{r detail_non_prob}
+non_prob
+```
+

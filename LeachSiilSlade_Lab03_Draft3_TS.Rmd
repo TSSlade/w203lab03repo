@@ -43,7 +43,6 @@ crime_raw <- read_csv('crime_v2.csv', col_types = cols(prbconv = col_double()))
 #problems(crime_raw) # TS: To comment out once we're ready to generate our draft report.
 #crime_raw[97, ]
 ```
-
 We begin by exploring our dataset. We see that it has `r dim(crime_raw)[1]` records and `r dim(crime_raw)[2]` variables.
 
 ```{r initial_look}
@@ -51,11 +50,31 @@ dim(crime_raw)
 names(crime_raw)
 ```
 
+We generate a series of scatterplots that we use to examine our variables. Code is presented below, but results are omitted for parsimony.^[They can be viewed in the \textit{Appendix}]
+
+```{r scatterplots, results = "hide"}
+make_scatters <- function(df, var_list, y, trans) {
+  
+  if(!missing(trans)) {
+    var_list <- append(var_list, str_glue('{trans}({var_list})'))
+  }
+
+  for (v in var_list){
+  print(ggplot(df, aes_string(x = v, y = y)) +
+          geom_point() + 
+          geom_smooth(method = 'lm', se = FALSE) +
+          xlab(v) +
+          ylab(y) +
+          ggtitle(str_glue('{y} vs {v}'))
+        )
+    } 
+}
+```
+
 The notes we receive provide the following insight into the variables:
 \begin{center} % https://community.rstudio.com/t/inserting-table-in-r-markdown/7260/4
 \captionof{table}{Available Variables from Cornwell \& Trumball (1994)}
-\begin{tabular}{|l|l|l|l|}
-\hline
+\begin{tabular}{l|l l l}
  \# & Variable Name & Type & Description \\ \hhline{|=|=|=|=|}
   1 & \texttt{county} & integer & \textit{Source county of data} \\
   2 & \texttt{year} & integer & \textit{Source year of data} \\
@@ -94,7 +113,7 @@ We find `r nrow(crime_raw %>% filter_all(any_vars(is.na(.))))` rows that are mis
 
 ```{r eda_drop_blank_rows}
 crime_na <- crime_raw %>% filter_all(any_vars(!is.na(.))) # Rows with no data
-crime_na %>% filter_all(any_vars(is.na(.))) %>% select(which(!is.na(.))) # Row with one back tick
+crime_na %>% filter_all(any_vars(is.na(.))) %>% select(which(!is.na(.))) # Formerly row with one back tick
 crime_na <- crime_na %>% filter_all(all_vars(!is.na(.))) # Verification
 ```
 
@@ -113,7 +132,7 @@ crime_na <- crime_na %>% filter(!duplicated(.)) # removed
 
 ## Plausibility Checks for Variables
 
-Three of our key variables of interest (`prbarr`, `prbconv`, and `prbpris`) represent probabilities and would therefore be expected to lie in the range of 0:1.
+Three of our key variables of interest (`prbarr`, `prbconv`, and `prbpris`) represent probabilities and should therefore theoretically be in the range of 0:1.
 
 ```{r eda_prob_beyond_range}
 # Examine 'probability' variables.
@@ -121,7 +140,7 @@ non_prob <- crime_na %>%
   filter(!between(prbarr, 0, 1) | !between(prbconv, 0, 1) | !between(prbpris, 0, 1))
 ```
 
-Examining the data, we find `r nrow(non_prob)` counties have values for the "probability" variables that are outside of the expected range. In each case, it is either `prbconv` (10 records) or `prbarr` (1 record) that fall outside the range.
+Examining the data^[See the \textit{Appendix} for the `non_prob` table], we find `r nrow(non_prob)` counties have values for the "probability" variables that are outside of the expected range. In each case, it is either `prbconv` (10 records) or `prbarr` (1 record) that fall outside the range.
 
 Per the notes accompanying our data, \textit{The probability of conviction is proxied by the ratio of convictions to arrests...} Given that definition, if not all suspects arrested are convicted, `prbconv` will be below 1. However, it may also exceed 1 if the number of exonerated suspects is exceeded by the number of suspects convicted of multiple charges. (See \href{https://www.michigancriminallawyer-blog.com/2014/08/this-blog-is-based-upon.html}{ \textbf{\color{blue}{here}}} for examples of multiple charges stemming from a single arrest.)
 
@@ -132,9 +151,6 @@ In both cases, there are plausible explanations for a probability value in exces
 ``` {r remove_outlier, include = FALSE}
 # crime_na <- crime_na[crime_na$prbarr<=1,] # TS: I have commented this out, as we now know the outlier makes sense.
 ```
-
-## Further Context
-
 
 ```{r eda_plausibility_checks, echo = FALSE, results = "hide", fig.show = "hide"}
 plot(density(crime_na$year)) # TS: Confirmed all 1987
@@ -165,9 +181,9 @@ Examining the remainder of our data, we found no substantial evidence of _top-co
 
 ## Transformation Analysis
 
-If the relationship between two variables is not linear, adding them to a linear regression model as-is (without a transformation) will generate inaccurate results and possibly result in an invalidation of our heteroskedsticity assumption. It is therefore important to explore whether the relationship between two variables shares some non-linear relationship and thus whether a transformation is required.   As part of our EDA we explored this question for all of the variables in the dataset.
+If the relationship between two variables is not linear, adding them to a linear regression model as-is (without a transformation) will generate inaccurate results and possibly result in an invalidation of our heteroskedasticity assumption. It is therefore important to explore whether the relationship between two variables shares some non-linear relationship and thus whether a transformation is required. As part of our EDA we explored this question for all of the variables in the dataset.
 
-Our first step was to evaluate if any variables had signficant skew in their distributions by checking whether they generally conformed to a normal distribution using R's qqplot.  While this is not necessarily a reason to transform a variable, it can help us identify variables of interest.
+Our first step was to evaluate if any variables had significant skew in their distributions by checking whether they generally conformed to a normal distribution using R's qqplot.  While this is not necessarily a reason to transform a variable, it can help us identify variables of interest.^[See \textit{Appendix} for detailed code.]
 
 ``` {r skewed_variables, echo=FALSE, results="hide", fig.show = "hide"}
 for (i in 1:length(colnames(crime_na))){
@@ -176,11 +192,11 @@ for (i in 1:length(colnames(crime_na))){
 }
 ```
 
-From our graphs we saw that probability of arrest (prbarr), probability of conviction (prbconv), police per capita (polpc), tax revenue per capita (taxpc), density (density),percent young male (pctymle), and mix (mix) deviated from normality.  We will consider this in addition to other factors when deciding if a transformation would be beneficial.  
+From our graphs we saw that probability of arrest (`prbarr`), probability of conviction (`prbconv`), police per capita (`polpc`), tax revenue per capita (`taxpc`), population density (`density`), proportion of young males in the population (`pctymle`), and the mix of face-to-face vs. impersonal crimes (`mix`) all deviated from normality.  We will consider this in addition to other factors when deciding if a transformation would be beneficial.  
 
-Secondly, while not a perfect approach due to the possible interactions amongst variables, we also wanted to look at whether there is any obvious non-linearity  when looking at crime rate and each variable independently.  To do this we looked at a scatterplot of crime rate vs. each variable.
+Secondly, while not a perfect approach due to the possible interactions amongst variables, we also wanted to look at whether there is any obvious non-linearity  when looking at crime rate and each variable independently.  To do this we looked at a scatterplot of crime rate vs. each variable. ^[See \textit{Appendix} for detailed code]
 
-``` {r relationship_of_interest, echo=FALSE, resulst="hide", fig.show = "hide"}
+``` {r relationship_of_interest, echo=FALSE, results="hide", fig.show = "hide"}
 for (i in 1:length(colnames(crime_na))){
   column_interest <- paste("crime_na$",colnames(crime_na)[i],sep='')
   plot(eval(parse(text=column_interest)),crime_na$crmrte,main=colnames(crime_na)[i],
@@ -188,138 +204,92 @@ for (i in 1:length(colnames(crime_na))){
 }
 ```
 
-Reviewing these graphs yields five (5) variables which appear to have a non-linear relationship with crime rate: Probability of arrest(prbarr), probability of conviction (prbconv), police per capita (polpc), density (density), and tax revenue per capita (taxpc).  Four of the variables appear to benefit from a log transform, while the fifth (density) appear to be related to crime rate via the square root function.  In addition to checking whether the relationship appeared to improve in linearity, we also checked whether this transformation helped with variable skew.  In every case the distribution of our variable moved closer to normality. Given the improvement in linearity and normality we will use these transformations moving forward.
+Reviewing these graphs yields five (5) variables which appear to have a non-linear relationship with crime rate: `prbarr`, `prbconv`, `polpc`, `density`, and `taxpc`.  While it is not particularly important that predictor variables be normally distributed, we do want them to display both \textit{symmetry} and \textit{high variance}; to the extent applying a transformation advances those goals, it is worth considering provided it does not inhibit interpretability or run strongly counter to theory.
 
-Linearity Graphs:
-``` {r linearity testing}
+Four of the variables appear to benefit from a log transform, while the fifth `density` appears to be related to crime rate via the square root function.  The pre- and post-transformation scatterplots and q-q plots for `prbconv` are presented here for illustrative purposes. ^[See the \textit{Appendix} for the others.] In addition to checking whether the relationship appeared to improve in linearity, we also checked whether this transformation helped with variable skew.  In every case the distribution of our variable moved closer to normality. \textbf{\color{red}{Given the improvement in linearity and normality we will use these transformations moving forward. <- TS: Given what we now know about not needing to transform dependent variables unless it helps with our need for symmetry and high variability, do we still want to do this?}}
 
-#Relationship to crime rate with and without transformation
-plot(crime_na$prbarr,crime_na$crmrte)
-plot(log(crime_na$prbarr),crime_na$crmrte)
+## Linearity Graphs:
 
-plot(crime_na$prbconv,crime_na$crmrte)
-plot(log(crime_na$prbconv),crime_na$crmrte)
-
-plot(crime_na$polpc,crime_na$crmrte)
-plot(log(crime_na$polpc),crime_na$crmrte)
-
-plot(crime_na$density,crime_na$crmrte)
-plot(sqrt(crime_na$density),crime_na$crmrte)
-
-plot(crime_na$taxpc,crime_na$crmrte)
-plot(log(crime_na$taxpc),crime_na$crmrte)
-
+```{r linearity1, out.width='50%'}
+#make_scatters(df = crime_na, var_list = c('prbarr'), y = 'crmrte', trans = 'log')
+```
+```{r linearity2, out.width='50%'}
+make_scatters(df = crime_na, var_list = c('prbconv'), y = 'crmrte', trans = 'log')
+```
+```{r linearity3, out.width='50%'}
+#make_scatters(df = crime_na, var_list = c('polpc'), y = 'crmrte', trans = 'log')
+```
+```{r linearity4, out.width='50%'}
+#make_scatters(df = crime_na, var_list = c('density'), y = 'crmrte', trans = 'sqrt')
+```
+```{r linearity5, out.width='50%'}
+#make_scatters(df = crime_na, var_list = c('taxpc'), y = 'crmrte', trans = 'log')
 ```
 
 Normality/Skew With and Without Transformation:
 
-``` {r skewness graphs}
-
+``` {r prbarr_skewness, out.width = '50%', results='hide', fig.keep='all'}
 #Normality/skew with and without transformations
-qqnorm(crime_na$prbarr)
-qqnorm(log(crime_na$prbarr))
-
-qqnorm(crime_na$prbconv)
-qqnorm(log(crime_na$prbconv))
-
-qqnorm(crime_na$polpc)
-qqnorm(log(crime_na$polpc))
-
-qqnorm(crime_na$density)
-qqnorm(sqrt(crime_na$density))
-
-qqnorm(crime_na$taxpc)
-qqnorm(log(crime_na$taxpc))
+#print(c(qqnorm(crime_na$prbarr), qqnorm(log(crime_na$prbarr))))
 ```
 
+```{r prbconv_skewness, out.width = '50%', results='hide', fig.keep='all'}
+print(c(qqnorm(crime_na$prbconv), qqnorm(log(crime_na$prbconv))))
+```
 
-## Variables Available for Analysis
+```{r polpc_skewness, out.width = '50%', results='hide', fig.keep='all'}
+#print(c(qqnorm(crime_na$polpc), qqnorm(log(crime_na$polpc))))
+```
 
-The table below details the variables available to us, which model(s) we included them in, and any transformations we applied before including them in our model.
+```{r density_skewness, out.width = '50%', results='hide', fig.keep='all'}
+#print(c(qqnorm(crime_na$density), qqnorm(sqrt(crime_na$density))))
+```
 
-\textbf{\color{red}{To do: remove the 'used in models...' column, just add that information in the discussion before each model}}
+```{r taxpc_skewness, out.width = '50%', results='hide', fig.keep='all'}
+#print(c(qqnorm(crime_na$taxpc), qqnorm(log(crime_na$taxpc))))
+```
 
-\begin{center} % https://community.rstudio.com/t/inserting-table-in-r-markdown/7260/4
-\captionof{table}{Hypothesized Primary Determinants of Observed Crime Rate}
-\begin{tabular}{|l|l|p{2.5cm}|p{2cm}|}
-\hline
-Variable Name & Description & Transformation Applied & Models Using \\ \hhline{|=|=|=|=|}
-\texttt{county} & \textit{Source county of data} & - & - \\
-\texttt{year} & \textit{Source year of data} & - & - \\
-\texttt{crmrte} & \textit{crime rate} & - & 1, 2, 3, 4, 5 \\
-\texttt{prbarr} & \textit{`probability' of arrest} & - & 1, 2, 3, 4, 5 \\
-\texttt{prbconv} & \textit{`probability' of conviction} & - & 1, 2, 3, 4, 5 \\
-\texttt{prbpris} & \textit{`probability' of prison sentence} & square ($prbpris^2$) & 1, 2, 3 \\
-\texttt{avgsen} & \textit{average sentence, in days} & - & 2, 3 \\
-\texttt{polpc} & \textit{police per capita} & $\log(polpc)$ & 1, 2, 3, 4, 5 \\
-\texttt{density} & \textit{people per sq. mile} & \color{red}{$\sqrt(density)$} & 2, 3, 4 \\
-\texttt{taxpc} & \textit{tax revenue per capita} & $\log(taxpc)$ & 2, 3 \\
-\texttt{west} & \textit{Dummy: source county of data is in Western NC} & - & 3 \\
-\texttt{central} & \textit{Dummy: source county of data is in Central NC} & - & 3 \\
-\texttt{urban} & \textit{Dummy: source county of data is urban} & - & 3 \\
-\texttt{pctmin80} & \textit{percent minority in 1980} & \color{red}{TBD-Guys??} & 2, 3, 4 \\
-\texttt{wcon} & \textit{wages in the construction industry} & - & 3 \\
-\texttt{wtuc} & \textit{wages in the transportation, utilities, and communication industries} & - & 3 \\
-\texttt{wtrd} & \textit{wages in the construction industry} & - & 3 \\
-\texttt{wfir} & \textit{wages in the finance, insurance, real estate industries} & - & 3 \\
-\texttt{wser} & \textit{wages in the service industry} & - & 3 \\
-\texttt{wmfg} & \textit{wages in the manufacturing industry} & - & 3 \\
-\texttt{wfed} & \textit{wages among federal employees} & - & 3 \\
-\texttt{wsta} & \textit{wages among state employees} & - & 3 \\
-\texttt{wloc} & \textit{wages among local government employees} & - & 3 \\
-\texttt{mix} & \textit{mix of offenses; face-to-face v others} & - & 3 \\
-\texttt{pctymle} & \textit{percent young male} & $\log(pctymle)$ & 2, 3 \\
-\hline
-\end{tabular}
-\end{center}
-
-\[
-%\begin{table}[!h]
-%\centering
-%\caption{Hypothesized Primary Determinants of Observed Crime Rate}
-%\label{pntable}
-%%\begin{tabular}{l>{\raggedright\arraybackslash$}p{2cm}>{$}|l|c}
-%\begin{tabular}{p{1.5cm} | >{\raggedright}p{3cm} | p{8cm} | p{2cm}}
-%\toprule
-%\centering\textbf{Variable Name} & \centering\textbf{Explanation} & \centering\textbf{Reasoning} & \centering\textbf{Transformation Applied} & \\
-%\midrule
-%\texttt{polpc} & \textit{police per capita} & Police may act as a deterrent to crime, may increase the observed crime rate, or both. & - \\
-%\texttt{pctymle} & \textit{percent young male} & Young males commit and are charged with a disproportionate share of crimes & - \\
-%\texttt{density} & \textit{people per sq. mile} & Greater population density increases opportunity for crimes to be committed and reported & - \\
-%\texttt{taxpc} & \textit{tax revenue per capita} & Lower tax revenues may be associated with poorer community-government relations, greater economic hardship, and less policing \footnote{This may introduce collinearity with several other variables} & $log_{10}$  \\
-%\texttt{prbarr} & \textit{`probability' of arrest} & Greater probability of arrest may serve a deterrent function & - \\
-%\texttt{prbconv} & \textit{`probability' of conviction} & Greater probability of conviction may serve a deterrent function & - \\
-%\texttt{prbpris} & \textit{`probability' of prison sentence} & Greater probability of sentencing may serve a deterrent function & - \\
-%\texttt{avgsen} & \textit{average sentence, in days} & Harsher sentencing practices may serve a deterrent function & - \\
-%\texttt{pctmin80} & \textit{percent minority in 1980} & Minorities are disproportionately arrested and convicted of crimes & - \\
-%\bottomrule
-%\end{tabular}
-%\end{table}
-\]
+Finally, we examined collinearity between various variables that we thought would comprise our models. For the sake of narrative flow, discussion of those findings is presented alongside the models in question.
 
 # Research Question and Model-Building
 
-Our **research question** is the following: \textbf{\color{red}{Should our candidate support a traditional "Tough on Crime" platform?}}
+Our **research question** is the following: \textbf{\color{red}{Should our candidate support a traditional "Tough on Crime" platform? ** <- TS: I still think we should reframe this somehow. Let's discuss.**}}
 
-We face a key limitation: our data does not give us visibility into the crimes themselves or changes in crime, but rather provides only the official _crime rate_. The crime rate is a function not only of crimes committed but also of various factors, some of which may be unobservable. For instance, poor community-police relations may bias crime rates downward if an area's residents \href{https://www.washingtonpost.com/news/acts-of-faith/wp/2018/04/19/churches-make-a-drastic-pledge-in-the-name-of-social-justice-to-stop-calling-the-police/?utm_term=.ac2ea8ee1523}{\textbf{\color{blue}{do not report all the crimes they observe or experience}}}. Conversely, those poor relations may also bias crime rates upward if police officers engage in \href{https://www.huffingtonpost.com/2015/05/04/st-louis-county-predatory-policing_n_7201964.html}{\textbf{\color{blue}{predatory policing practices}}} and the community lacks the wherewithal to fight back.  A full discussion of omitted variable bias will occur later in this analysis.
+We face a key limitation: our data does not give us visibility into the crimes themselves or changes in crime, but rather provides only the official _crime rate_. The crime rate is a function not only of crimes committed but also of various additional factors, some of which may be unobservable. For instance, poor community-police relations may bias crime rates downward if an area's residents \href{https://www.washingtonpost.com/news/acts-of-faith/wp/2018/04/19/churches-make-a-drastic-pledge-in-the-name-of-social-justice-to-stop-calling-the-police/?utm_term=.ac2ea8ee1523}{\textbf{\color{blue}{do not report all the crimes they observe or experience}}}. Conversely, those poor relations may also bias crime rates upward if police officers engage in \href{https://www.huffingtonpost.com/2015/05/04/st-louis-county-predatory-policing_n_7201964.html}{\textbf{\color{blue}{predatory policing practices}}} and the community lacks the wherewithal to fight back.  A full discussion of omitted variable bias will occur later in this analysis, but we preface our model-building section with this note to as a practical way to invite the reader to critically examine the models we propose.
 
-In order to answer our research question we created several models which included variables related to key crime policy decisions.  We only included variables which would allow our canadidate to make concrete policy proposals that lie within her purview.
+In order to answer our research question we created several models which included variables related to key crime policy decisions. While there are `r length(names(crime_raw))` variables in our raw dataset, our model-building proceeded systematically. First, we grouped variables together \textit{thematically}. Next, we built a model with the variables comprising the theme we believed \textit{a priori} would be most likely to have high predictive value. After evaluating the model's performance, we added the variables for the next theme, and so forth.
 
-Using the aforementioned criteria we choose the variables police per capita (`polpc`), probability of arrest (`prbarr`), probability of conviction (`prbconv`), probability of incarceration (`prbpris`), and average sentence length (`avgsen`) for our first model.  Understanding how these items relate to crime rate can help shape her position, and understand whether a "Tough on Crime" stance does in fact acheive a reduction in crime.  Specifically, we can help her understand which departement/function should receive additional funding given a limited budget (e.g. if conviction rates are highly correlated perhaps we invest more in our District Attorneys).
+## Thematic grouping of variables
 
-\begin{center} % https://community.rstudio.com/t/inserting-table-in-r-markdown/7260/4
-\captionof{table}{Model 1: Hypothesized Key Determinants of Observed Crime Rate}
-\begin{tabular}{|l|l|l|}
-\hline
-Variable Name & Description & Transformation Applied \\ \hhline{|=|=|=|}
-\texttt{prbarr} & \textit{`probability' of arrest} & - \\
-\texttt{prbconv} & \textit{`probability' of conviction} & - \\
-\texttt{prbpris} & \textit{`probability' of prison sentence} & square ($prbpris^2$) \\
-\texttt{avgsen} & \textit{average sentence, in days} & - \\
-\texttt{polpc} & \textit{police per capita} & $\log(polpc)$ \\
-\hline
-\end{tabular}
-\end{center}
+\textbf{Theme 1: Crime \& Punishment}
+
+Our first theme revolves around crime and the likelihood of punishment resulting from the act of committing a crime. We believe that the variables police per capita (`polpc`), probability of arrest (`prbarr`), probability of conviction (`prbconv`), probability of incarceration (`prbpris`), and average sentence length (`avgsen`) fit well together. Taken comprehensively, they help frame the observed crime rate in economic terms as a sort of "risk-reward" proposition for would-be criminals: is the presence of a well-functioning criminal justice system^[Using an admittedly naïve formulation in which socioeconomic status, racial bias, and predatory policing are assumed to be non-issues.]—in which crimes consistently lead to arrests (of the actual perpetrators, and not innocent bystanders), and arrests consistently lead to (warranted) convictions, and convictions lead to prison sentences, and sentences are indeed punitive—predictively associated with the crime rate? 
+
+The variables in this theme are particularly valuable because they provide a solid foundation for policy development. If the size of the police force is associated with changes in the crime rate, it can be scaled up or scaled down appropriately. If the probability of arrest makes a difference, the county could invest in improving community-police relationships with the goal \textbf{\color{red}{of improving investigations and... <- TS: sort of lost my train of thought here.}} If the probability of conviction is important, funds could be invested in further training the police and District Attorneys on the gathering and presentation of evidence. If the probability of incarceration and average sentence are important, legislators could advocate for changes to sentencing guidelines.
+
+\textbf{Theme 2: Demography \& Economics}
+
+Our second theme focuses on issues of community composition, economic resources, and opportunity.^[We believe that many of these variables may be covariates of the predictors we included in \textbf{Model 1}, but they are sufficiently distinct as to warrant their own model.] Population density (`density`) may influence the crime rate in complex ways: from a sociological perspective, the \color{blue}{ \href{http://open.lib.umn.edu/sociology/chapter/7-2-explaining-deviance/}{social ecology approach}} to studying criminality considers population density to be one of several so-called \textit{criminogenic} (``crime-causing'') factors. From a psychological perspective, a larger population may weaken community bonds^[Consider the various tiers of \color{blue}{ \href{https://www.newyorker.com/science/maria-konnikova/social-media-affect-math-dunbar-number-friendships}{Dunbar's number}}] and thus the pressure to exhibit prosocial behavior. Where significant wealth or income disparities exist within close proximity, \color{blue}{ \href{http://journals.sagepub.com/doi/abs/10.1177/1362480607072737?journalCode=tcra}{relative deprivation theory}} suggests population density may drive greater criminality. On the other hand, large, sparsely-populated swathes of land are difficult for police to monitor and may present opportunities for various non-violent crimes.^[Consider, for instance, the prevalence of \color{blue}{\href{}{marijuana cultivation in rural northern California}} or \color{blue}{\href{}{moonshine production in the rural South}}. Both are industries in which lots of land with very few people living on it is a desirable feature.]
+
+\color{blue}{\href{http://open.lib.umn.edu/sociology/chapter/7-2-explaining-deviance/}{Social control theory}} suggests that young people with weaker bonds to their communities may be more likely to commit crime. Indeed, \href{https://www.jstor.org/stable/2138282?}{economic} and criminological research over the last several decades has argued \color{blue}{\href{http://www.nber.org/chapters/c6806.pdf}{young men}} are disproportionately involved in crime. There has also been widespread discussion of \href{https://scholarship.law.ufl.edu/cgi/viewcontent.cgi?article=1003&context=csrrr_events}{the role that race and ethnicity play in criminality}. We thus include the variables `pctymle` and `pctmin80` in this model.
+
+The police force is funded by the local government, which in turn is funded by the local taxpayers. We might thus expect that the taxes paid per capita (`taxpc`) might have an influence on the size and/or effectiveness of the police force, either reinforcing or undermining any effect `polpc` might have on the crime rate.
+
+The dataset contains 9 variables related to wage: `wfed`, `wsta`, `wloc`, `wmfg`, `wser`, `wcon`, `wfir` `wtrd`, `wtuc`. While much of their cumulative influence on a community may be captured in the `taxpc` variable - and thus we must beware excessive collinearity - different groupings of those wage variables may provide insight into well- or under-funded segments of the local economy.
+
+\textbf{Theme 3: `The Kitchen Sink, or, everything else'}
+
+
+
+## Building of Initial Models
+
+### Model 1: Crime \& Punishment
+
+Drawing upon the transformations suggested by our exploratory data analysis and the discussion above, the first model we develop and examine is thus as follows:
+
+\[
+    \texttt{crmrte} = \beta_0 + \beta_1\log(\texttt{polpc}) + \beta_2\texttt{prbarr} + \beta_3\texttt{prbconv} + \beta_4\texttt{prbpris}^2 + \beta_5\texttt{avgsen} + u
+\]
 
 ``` {r mod1_notransf, echo = FALSE, results = FALSE}
 #Linear Regression model using only our key variables of interest.
@@ -355,7 +325,7 @@ The log of police per capita, the log of the probability of arrest, and the log 
 
 ## Model 2
 
-While our first model showed promise there are several other factors which might be correlated with these explanatory variables; this would lead to multicollinearity issues.  In order to avoid biased coefficient estimates, and to improve upon our model we created second model which includes variables we believe to be highly correlated with our three key variables.
+While our first model showed promise there are several other factors which might be correlated with these explanatory variables; this would lead to multicollinearity issues.  When multiple independent variables exhibit collinearity it becomes increasingly difficult to untangle their individual effects on the crime rate.  This is troublesome because the model coefficients  may misrepresent the impact of a variable, leading to a policy which has underwhelming impact.  In order to avoid biased coefficient estimates, and to improve upon our model we created second model which includes variables we believe to be highly correlated with our three key variables.
 
 \textbf{Collinearity with Police Per Capita}: We would expect policing practices in urban areas to differ substantially from those in suburban or rural areas; including density can help control for this. Additionally, the police force is funded by taxpayers, and therefore we might expect a larger police force per capita to be correlated with higher tax revenues.
 
@@ -366,6 +336,23 @@ Our dataset contains 9 wage variables, each representing a different sector or g
   1) Government Wage: Average of `wfed` (federal government wage), `wsta` (state government wage), and `wloc` (local government wage)
   2) Blue-Collar Wage: Average of `wmfg` (manufacturing), `wser` (service), `wcon` (construction)
   3) Professional Wage: Average of `wfir` (Finance/Investment/Real Estate), `wtrd` (Wholesale/Retail Trade), and `wtuc` (Transportation, Utilities, Communication)
+  
+```{r warning=FALSE}
+crime_na %>% 
+  gather(wfed, wtuc, wsta, wmfg, wfir, wloc, wcon, wser, wtrd, key = 'work_type',
+         value = 'weekly_wage') %>%
+  select(county, work_type, weekly_wage, everything()) %>%
+  mutate(work_type = factor(work_type, c('wfed', 'wtuc', 'wsta', 'wmfg', 'wfir',
+                                         'wloc', 'wcon', 'wser', 'wtrd'))) %>%
+  ggplot(aes(x = weekly_wage, fill = work_type)) +
+  geom_density(alpha = 0.5) +
+  scale_fill_brewer(palette = 'Spectral') +
+  ggtitle('Weekly Wage Density by position') +
+  xlab('Weekly Wage $/week') +
+  ylab('Density') +
+  labs(fill = 'Work type') +
+  xlim(0, 750) 
+```  
 
 ``` {r new_variable_creation}
 crime_na$govt_wg <- (crime_na$wfed+crime_na$wsta+crime_na$wloc)/3
@@ -522,7 +509,10 @@ Despite the promising results from our three models it is difficult to ascribe c
 4) Policing Methodology: In recent years there has been a growing focus on "warrior" versus "guardian" mindsets in policing.  Depending on the type of methodology we might see very different rates of arrest and conviction.
 
 5) Police Representation: A community's relationship with the police can vary drastically from place to place.  In recent years certain cities have had significant unrest, with a key element being a majority white police force existing in a largely minority community.  Similar to police methodology, we might expect very different rates of arrest and conviction depending on whether the community feels the police represent them and their interests.
-6)
+
+6) Criminals' Perception of Risk-Reward Ratios: Of particular relevance to the Model 1 ("Crime and Punishment") analysis is the issue of criminals' perception of the ``effectiveness'' of the justice system. The model makes two critical assumptions: first, that criminality is driven by rational behavior; second, that criminals have sufficient insight into the outcomes of criminal justice proceedings for their decisions (which we are assuming to be rational) to be informed by them. Obviously if criminals are not of the genus \textit{Homo economicus}, a major theoretical underpinning of the model is removed. However, even if criminals \textit{are} rational actors, they may be operating with imperfect information: they may make the "incorrect" risk-reward calculation if they are unaware of how risky their criminality truly is. For instance, a thief who does not know the District Attorney always \`gets her man' may not be deterred by a high `prbconv` as our model might assume. Similarly, the salience of the potential punishment 
+
+7) 
 
 ## Conclusion: Findings and Policy Recommendations
 
@@ -540,30 +530,87 @@ The relationships suggested by our models are intuitive: an increase in the numb
 
 Four of them are simple to interpret: a 1% increase in the number of police is associated with an increase in the crime rate of 11.1 crimes per 100,000 people. Increasing by 1% the probability that a crime report leads to an arrest is associated with a decrease in the crime rate of 15.9 crimes per 100,000 people; a similar increase in the probability of conviction is associated with a decrease in the crime rate of 10.2 crimes per 100,000 people. A 1% increase in the minority share of the population is associated with an increase of 3.8 crimes per 100,000 people. The relationship with the population density is more complex, however, and bears further investigation
 
-```{r, results="hide",fig.show="hide"}
-mod1vars <- c("polpc","prbarr","prbconv","prbpris","avgsen")
-mod2vars <- c("taxpc","density","govt_wg","pctymle","pctmin80")
-mod3vars <- c("")
-for (v in mod1vars){
-  print(ggplot(crime_na, aes(y = crmrte)) +
-          geom_point(aes_string(x = v)) + 
+# Appendix
+
+\textbf{Detail: scatterplots of variables generated during EDA.}
+```{r scatterplots_appendix, out.width="33%"}
+make_scatters <- function(df, var_list, y, trans) {
+  
+  if(!missing(trans)) {
+    var_list <- append(var_list, str_glue('{trans}({var_list})'))
+  }
+
+  for (v in var_list){
+  print(ggplot(df, aes_string(x = v, y = y)) +
+          geom_point() + 
+          geom_smooth(method = 'lm', se = FALSE) +
           xlab(v) +
-          ylab('Crime Rate') +
-          ggtitle(str_glue('Crime Rate vs {v}'))
-          )
-  print(ggplot(crime_na) +
-          geom_qq(aes_string(sample = v)) +
-            xlab(v))
+          ylab(deparse(substitute(y))) +
+          ggtitle(str_glue('{deparse(substitute(y))} vs {v}'))
+        )
+    } 
 }
-for (v in mod2vars){
-  print(ggplot(crime_na, aes(y = crmrte)) +
-          geom_point(aes_string(x = v)) + 
-          xlab(v) +
-          ylab('Crime Rate') +
-          ggtitle(str_glue('Crime Rate vs {v}'))
-          )
-  print(ggplot(crime_na) +
-          geom_qq(aes_string(sample = v)) +
-            xlab(v))
+
+make_scatters(crime_na, var_list = names(crime_na), crime_na$crmrte)
+```
+
+\textbf{Detail: observations in which the `probability' variables did not behave as probabilities insofar as they fell outside the range of 0:1.}
+```{r non_prob_appendix}
+non_prob
+```
+
+\textbf{Detail: code to generate qqplots for evaluation of normality in EDA step}
+``` {r skewed_variables_appendix, out.width = "33%"}
+for (i in 1:length(colnames(crime_na))){
+  column_interest <- paste("crime_na$",colnames(crime_na)[i],sep='')
+  qqnorm(eval(parse(text=column_interest)),main=colnames(crime_na)[i])
 }
+```
+
+\textbf{Detail: code to explore `crime rate` vs. specific variables of interest}
+``` {r relationship_of_interest_appendix, out.width = "33%"}
+for (i in 1:length(colnames(crime_na))){
+  column_interest <- paste("crime_na$",colnames(crime_na)[i],sep='')
+  plot(eval(parse(text=column_interest)),crime_na$crmrte,main=colnames(crime_na)[i],
+       ylab="Crime Rate",xlab=colnames(crime_na)[i])
+}
+```
+
+\textbf{Detail: pre- and post-transformation scatterplots and q-q plots}
+```{r linearity1_appendix, out.width='50%'}
+make_scatters(df = crime_na, var_list = c('prbarr'), y = 'crmrte', trans = 'log')
+```
+```{r linearity2_appendix, out.width='50%'}
+make_scatters(df = crime_na, var_list = c('prbconv'), y = 'crmrte', trans = 'log')
+```
+```{r linearity3_appendix, out.width='50%'}
+make_scatters(df = crime_na, var_list = c('polpc'), y = 'crmrte', trans = 'log')
+```
+```{r linearity4_appendix, out.width='50%'}
+make_scatters(df = crime_na, var_list = c('density'), y = 'crmrte', trans = 'sqrt')
+```
+```{r linearity5_appendix, out.width='50%'}
+make_scatters(df = crime_na, var_list = c('taxpc'), y = 'crmrte', trans = 'log')
+```
+
+``` {r skewnessgraphs_appendix, out.width = '50%', results='hide', fig.keep='all'}
+#Normality/skew with and without transformations
+print(c(qqnorm(crime_na$prbarr), qqnorm(log(crime_na$prbarr))))
+
+```
+
+```{r prbconv_appendix, out.width = '50%', results='hide', fig.keep='all'}
+print(c(qqnorm(crime_na$prbconv), qqnorm(log(crime_na$prbconv))))
+```
+
+```{r polpc_appendix, out.width = '50%', results='hide', fig.keep='all'}
+print(c(qqnorm(crime_na$polpc), qqnorm(log(crime_na$polpc))))
+```
+
+```{r density_appendix, out.width = '50%', results='hide', fig.keep='all'}
+print(c(qqnorm(crime_na$density), qqnorm(sqrt(crime_na$density))))
+```
+
+```{r taxpc_appendix, out.width = '50%', results='hide', fig.keep='all'}
+print(c(qqnorm(crime_na$taxpc), qqnorm(log(crime_na$taxpc))))
 ```
