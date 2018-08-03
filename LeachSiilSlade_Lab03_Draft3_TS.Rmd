@@ -140,7 +140,7 @@ non_prob <- crime_na %>%
   filter(!between(prbarr, 0, 1) | !between(prbconv, 0, 1) | !between(prbpris, 0, 1))
 ```
 
-Examining the data^[See the \textit{Appendix} for the `non_prob` table], we find `r nrow(non_prob)` counties have values for the "probability" variables that are outside of the expected range. In each case, it is either `prbconv` (10 records) or `prbarr` (1 record) that fall outside the range.
+Examining the data^[See \textit{Appendix} for the `non_prob` table], we find `r nrow(non_prob)` counties have values for the "probability" variables that are outside of the expected range. In each case, it is either `prbconv` (10 records) or `prbarr` (1 record) that fall outside the range.
 
 Per the notes accompanying our data, \textit{The probability of conviction is proxied by the ratio of convictions to arrests...} Given that definition, if not all suspects arrested are convicted, `prbconv` will be below 1. However, it may also exceed 1 if the number of exonerated suspects is exceeded by the number of suspects convicted of multiple charges. (See \href{https://www.michigancriminallawyer-blog.com/2014/08/this-blog-is-based-upon.html}{ \textbf{\color{blue}{here}}} for examples of multiple charges stemming from a single arrest.)
 
@@ -194,7 +194,7 @@ for (i in 1:length(colnames(crime_na))){
 
 From our graphs we saw that probability of arrest (`prbarr`), probability of conviction (`prbconv`), police per capita (`polpc`), tax revenue per capita (`taxpc`), population density (`density`), proportion of young males in the population (`pctymle`), and the mix of face-to-face vs. impersonal crimes (`mix`) all deviated from normality.  We will consider this in addition to other factors when deciding if a transformation would be beneficial.  
 
-Secondly, while not a perfect approach due to the possible interactions amongst variables, we also wanted to look at whether there is any obvious non-linearity  when looking at crime rate and each variable independently.  To do this we looked at a scatterplot of crime rate vs. each variable. ^[See \textit{Appendix} for detailed code]
+Secondly, while not a perfect approach due to the possible interactions amongst variables, we also wanted to look at whether there is any obvious non-linearity  when looking at crime rate and each variable independently.  To do this we looked at a scatterplot of crime rate vs. each variable.^[See \textit{Appendix} for detailed code]
 
 ``` {r relationship_of_interest, echo=FALSE, results="hide", fig.show = "hide"}
 for (i in 1:length(colnames(crime_na))){
@@ -206,7 +206,7 @@ for (i in 1:length(colnames(crime_na))){
 
 Reviewing these graphs yields five (5) variables which appear to have a non-linear relationship with crime rate: `prbarr`, `prbconv`, `polpc`, `density`, and `taxpc`.  While it is not particularly important that predictor variables be normally distributed, we do want them to display both \textit{symmetry} and \textit{high variance}; to the extent applying a transformation advances those goals, it is worth considering provided it does not inhibit interpretability or run strongly counter to theory.
 
-Four of the variables appear to benefit from a log transform, while the fifth `density` appears to be related to crime rate via the square root function.  The pre- and post-transformation scatterplots and q-q plots for `prbconv` are presented here for illustrative purposes. ^[See the \textit{Appendix} for the others.] In addition to checking whether the relationship appeared to improve in linearity, we also checked whether this transformation helped with variable skew.  In every case the distribution of our variable moved closer to normality. \textbf{\color{red}{Given the improvement in linearity and normality we will use these transformations moving forward. <- TS: Given what we now know about not needing to transform dependent variables unless it helps with our need for symmetry and high variability, do we still want to do this?}}
+Four of the variables appear to benefit from a log transform, while the fifth `density` appears to be related to crime rate via the square root function.  The pre- and post-transformation scatterplots and q-q plots for `prbconv` are presented here for illustrative purposes.^[See \textit{Appendix} for the others.] In addition to checking whether the relationship appeared to improve in linearity, we also checked whether this transformation helped with variable skew.  In every case the distribution of our variable moved closer to normality. \textbf{\color{red}{Given the improvement in linearity and normality we will use these transformations moving forward. <- TS: Given what we now know about not needing to transform dependent variables unless it helps with our need for symmetry and high variability, do we still want to do this?}}
 
 ## Linearity Graphs:
 
@@ -265,21 +265,23 @@ In order to answer our research question we created several models which include
 
 Our first theme revolves around crime and the likelihood of punishment resulting from the act of committing a crime. We believe that the variables police per capita (`polpc`), probability of arrest (`prbarr`), probability of conviction (`prbconv`), probability of incarceration (`prbpris`), and average sentence length (`avgsen`) fit well together. Taken comprehensively, they help frame the observed crime rate in economic terms as a sort of "risk-reward" proposition for would-be criminals: is the presence of a well-functioning criminal justice system^[Using an admittedly naïve formulation in which socioeconomic status, racial bias, and predatory policing are assumed to be non-issues.]—in which crimes consistently lead to arrests (of the actual perpetrators, and not innocent bystanders), and arrests consistently lead to (warranted) convictions, and convictions lead to prison sentences, and sentences are indeed punitive—predictively associated with the crime rate? 
 
-The variables in this theme are particularly valuable because they provide a solid foundation for policy development. If the size of the police force is associated with changes in the crime rate, it can be scaled up or scaled down appropriately. If the probability of arrest makes a difference, the county could invest in improving community-police relationships with the goal \textbf{\color{red}{of improving investigations and... <- TS: sort of lost my train of thought here.}} If the probability of conviction is important, funds could be invested in further training the police and District Attorneys on the gathering and presentation of evidence. If the probability of incarceration and average sentence are important, legislators could advocate for changes to sentencing guidelines.
+The variables in this theme are particularly valuable because they provide a solid foundation for policy development. If the size of the police force is associated with changes in the crime rate, it can be scaled up or scaled down appropriately. If the probability of arrest makes a difference, the county could invest in improving community-police relationships with the goal \textbf{\color{red}{of improving investigations and... <- TS: sort of lost my train of thought here.}} If the probability of conviction is important, funds could be invested in further training the police and District Attorneys on the collection and presentation of evidence. If the probability of incarceration and average sentence are important, legislators could advocate for changes to sentencing guidelines.
 
 \textbf{Theme 2: Demography \& Economics}
 
-Our second theme focuses on issues of community composition, economic resources, and opportunity.^[We believe that many of these variables may be covariates of the predictors we included in \textbf{Model 1}, but they are sufficiently distinct as to warrant their own model.] Population density (`density`) may influence the crime rate in complex ways: from a sociological perspective, the \color{blue}{ \href{http://open.lib.umn.edu/sociology/chapter/7-2-explaining-deviance/}{social ecology approach}} to studying criminality considers population density to be one of several so-called \textit{criminogenic} (``crime-causing'') factors. From a psychological perspective, a larger population may weaken community bonds^[Consider the various tiers of \color{blue}{ \href{https://www.newyorker.com/science/maria-konnikova/social-media-affect-math-dunbar-number-friendships}{Dunbar's number}}] and thus the pressure to exhibit prosocial behavior. Where significant wealth or income disparities exist within close proximity, \color{blue}{ \href{http://journals.sagepub.com/doi/abs/10.1177/1362480607072737?journalCode=tcra}{relative deprivation theory}} suggests population density may drive greater criminality. On the other hand, large, sparsely-populated swathes of land are difficult for police to monitor and may present opportunities for various non-violent crimes.^[Consider, for instance, the prevalence of \color{blue}{\href{}{marijuana cultivation in rural northern California}} or \color{blue}{\href{}{moonshine production in the rural South}}. Both are industries in which lots of land with very few people living on it is a desirable feature.]
+Our second theme focuses on issues of community composition, economic resources, and opportunity.  Population density (`density`) may influence the crime rate in complex ways: from a sociological perspective, the \href{http://open.lib.umn.edu/sociology/chapter/7-2-explaining-deviance/}{\color{blue}{social ecology approach}} to studying criminality considers population density to be one of several so-called \textit{criminogenic} (``crime-causing'') factors. From a psychological perspective, a larger population may weaken community bonds^[Consider the various tiers of  \href{https://www.newyorker.com/science/maria-konnikova/social-media-affect-math-dunbar-number-friendships}{\color{blue}{Dunbar's number}}] and thus the pressure to exhibit prosocial behavior. Where significant wealth or income disparities exist within close proximity,  \href{http://journals.sagepub.com/doi/abs/10.1177/1362480607072737?journalCode=tcra}{\color{blue}{relative deprivation theory}} suggests population density may drive greater criminality. On the other hand, large, sparsely-populated swathes of land are difficult for police to monitor and may present opportunities for various non-violent crimes.^[Consider, for instance, the prevalence of \href{https://www.washingtonpost.com/news/national/wp/2018/03/16/feature/californias-outlaw-marijuana-culture-faces-a-harsh-reckoning-legal-weed/?utm_term=.458beb5c5d1a}{\color{blue}{marijuana cultivation in rural northern California}} or \href{https://www.smithsonianmag.com/travel/how-moonshine-bootlegging-gave-rise-nascar-180962014/}{\color{blue}{moonshine production in the rural South}}. Both are industries in which lots of land with very few people living on it is a desirable feature.]
 
-\color{blue}{\href{http://open.lib.umn.edu/sociology/chapter/7-2-explaining-deviance/}{Social control theory}} suggests that young people with weaker bonds to their communities may be more likely to commit crime. Indeed, \href{https://www.jstor.org/stable/2138282?}{economic} and criminological research over the last several decades has argued \color{blue}{\href{http://www.nber.org/chapters/c6806.pdf}{young men}} are disproportionately involved in crime. There has also been widespread discussion of \href{https://scholarship.law.ufl.edu/cgi/viewcontent.cgi?article=1003&context=csrrr_events}{the role that race and ethnicity play in criminality}. We thus include the variables `pctymle` and `pctmin80` in this model.
+\href{http://open.lib.umn.edu/sociology/chapter/7-2-explaining-deviance/}{\color{blue}{Social control theory}} suggests that young people with weaker bonds to their communities may be more likely to commit crime. Indeed, \href{https://www.jstor.org/stable/2138282?}{\color{blue}{economic}} and criminological research over the last several decades has argued \href{http://www.nber.org/chapters/c6806.pdf}{\color{blue}{young men}} are disproportionately involved in crime. There has also been widespread discussion of \href{https://scholarship.law.ufl.edu/cgi/viewcontent.cgi?article=1003&context=csrrr_events}{\color{blue}{the role that race and ethnicity play in criminality}}. We thus include the variables `pctymle` and `pctmin80` in this model.
 
 The police force is funded by the local government, which in turn is funded by the local taxpayers. We might thus expect that the taxes paid per capita (`taxpc`) might have an influence on the size and/or effectiveness of the police force, either reinforcing or undermining any effect `polpc` might have on the crime rate.
 
-The dataset contains 9 variables related to wage: `wfed`, `wsta`, `wloc`, `wmfg`, `wser`, `wcon`, `wfir` `wtrd`, `wtuc`. While much of their cumulative influence on a community may be captured in the `taxpc` variable - and thus we must beware excessive collinearity - different groupings of those wage variables may provide insight into well- or under-funded segments of the local economy.
+The dataset contains nine variables related to wage: `wfed`, `wsta`, `wloc`, `wmfg`, `wser`, `wcon`, `wfir`, `wtrd`, `wtuc`. While much of their cumulative influence on a community may be captured in the `taxpc` variable - and thus we must beware excessive collinearity - different groupings of those wage variables may provide insight into well- or under-funded segments of the local economy.
+
+We believe that many of these variables may exhibit some collinearity with the predictors we included in \textbf{Model 1}, but they are sufficiently distinct as to warrant their own model. Specifically, we suspect `taxpc` and `density` may be collinear with `polpc`; `pctymle` and `pctmin80` may be collinear with `prbarr`; and government wages (`wfed`, `wsta`, `wloc`) may be collinear with `prbconv`.^[The expected collinearity of government wages with `prbconv` is premised on a theorized relationship between `prbconv` as an outcome variable and the quality or effectiveness of police investigators, court-appointed advocates, judges, and other government officials \textit{as proxied} loosely \textit{by wage}.] We theorize that both `prbpris` and `avgsen` may be collinear with some underlying omitted variable (for instance, local sentencing guidelines), but lack an alternative variable that might serve as a reasonable proxy.
 
 \textbf{Theme 3: `The Kitchen Sink, or, everything else'}
 
-
+Of the `r length(names(crime_raw))` variables in the dataset, we incorporated five into \textbf{Model 1} and 13 into \textbf{Model 2}. Of the remaining seven, `year` is meaningless (it is a constant, 87, for all observations in the dataset) and `crmrte` is our outcome of interest. That leaves five we can incorporate into a final model that attempts to capture everything that might plausibly predict crime rate: three dummy variables describing a county's location within NC (`west`, `central`) and its degree of urbanization (`urban`), one describing the ratio of face-to-face vs. \`other' crimes (`mix`), and the county identifier (`county`), which we know is a FIPS code. The unifying theme for these variables is essentially the absence of a unifying theme: these are the leftovers.
 
 ## Building of Initial Models
 
@@ -287,9 +289,9 @@ The dataset contains 9 variables related to wage: `wfed`, `wsta`, `wloc`, `wmfg`
 
 Drawing upon the transformations suggested by our exploratory data analysis and the discussion above, the first model we develop and examine is thus as follows:
 
-\[
-    \texttt{crmrte} = \beta_0 + \beta_1\log(\texttt{polpc}) + \beta_2\texttt{prbarr} + \beta_3\texttt{prbconv} + \beta_4\texttt{prbpris}^2 + \beta_5\texttt{avgsen} + u
-\]
+\begin{align}
+    \texttt{crmrte} = \beta_0 &+ \beta_1\log(\texttt{polpc}) + \beta_2\texttt{prbarr} + \beta_3\texttt{prbconv} + \beta_4\texttt{prbpris}^2 + \beta_5\texttt{avgsen} + u
+\end{align}
 
 ``` {r mod1_notransf, echo = FALSE, results = FALSE}
 #Linear Regression model using only our key variables of interest.
@@ -325,9 +327,16 @@ The log of police per capita, the log of the probability of arrest, and the log 
 
 ## Model 2
 
-While our first model showed promise there are several other factors which might be correlated with these explanatory variables; this would lead to multicollinearity issues.  When multiple independent variables exhibit collinearity it becomes increasingly difficult to untangle their individual effects on the crime rate.  This is troublesome because the model coefficients  may misrepresent the impact of a variable, leading to a policy which has underwhelming impact.  In order to avoid biased coefficient estimates, and to improve upon our model we created second model which includes variables we believe to be highly correlated with our three key variables.
+Model 2 builds upon Model 1 by including the additional covariates discussed earlier. 
 
-\textbf{Collinearity with Police Per Capita}: We would expect policing practices in urban areas to differ substantially from those in suburban or rural areas; including density can help control for this. Additionally, the police force is funded by taxpayers, and therefore we might expect a larger police force per capita to be correlated with higher tax revenues.
+\begin{align}
+    \texttt{crmrte} = \beta_0 &+ \beta_1\log(\texttt{polpc}) + \beta_2\texttt{prbarr} + \beta_3\texttt{prbconv} + \beta_4\texttt{prbpris}^2 + \beta_5\texttt{avgsen} \tag{Model 1} \nonumber \\
+    &+ \beta_6\log(\texttt{taxpc}) + \beta_7\texttt{density} + \beta_8\texttt{pctymle} + \beta_9 \texttt{pctmin80} + \beta_{10}\texttt{} \nonumber \\
+    &+ \beta_{11}\texttt{} + \beta_{12}\texttt{} + \beta_{13}\texttt{} + \beta_{14}\texttt{} \nonumber \\
+    &+ \beta_{15}\texttt{} + \beta_{16}\texttt{} + \beta_{17}\texttt{} + \beta_{18}\texttt{} + u
+\end{align}
+
+\textbf{\color{red}{$\downarrow$ TS: This section still needs to find a new home. I just haven't found it yet.}}
 
 ### Creation of New Variables To Simplify Wage Metrics
 
@@ -359,30 +368,6 @@ crime_na$govt_wg <- (crime_na$wfed+crime_na$wsta+crime_na$wloc)/3
 crime_na$physical_wg <- (crime_na$wmfg+crime_na$wser+crime_na$wcon)/3
 crime_na$industry_wg <- (crime_na$wfir+crime_na$wtrd+crime_na$wtuc)/3
 ```
-
-\textbf{Collinearity with Probability of Arrest}: Sociological research suggests that men - especially young, minority men - are at an increased risk of arrest.  Therefore we will include both the `pctymle` (percentage of young male, under a log transformation) and `pctmin80` (percentage of minorities in 1980) variables. 
-
-\textbf{Collinearity with Probability of Conviction}: The likelihood of an arrest leading to a conviction depends not only on the culpability of the suspect, but also on the quality or effectiveness of the police department's investigative team, the district attorney, court-appointed advocates, judges, and other government officials.  Quality is an unobservable (omitted) variable, but it  might be loosely correlated with overall government wages. To proxy this we will include our government wage (govt_wg) variable.
-
-\textbf{Collinearity with Probability of Incarceration and Average Sentencing}: While there may be unobservable covariates for these two variables, we cannot identify any reasonable proxies to include in a revised model to address the issue.
-
-\begin{center} % https://community.rstudio.com/t/inserting-table-in-r-markdown/7260/4
-\captionof{table}{Model 2: Hypothesized Key Determinants of Observed Crime Rate with Additional Covariates}
-\begin{tabular}{|l|l|l|}
-\hline
-Variable Name & Description & Transformation Applied \\ \hhline{|=|=|=|}
-\texttt{prbarr} & \textit{`probability' of arrest} & - \\
-\texttt{prbconv} & \textit{`probability' of conviction} & - \\
-\texttt{prbpris} & \textit{`probability' of prison sentence} & square ($prbpris^2$) \\
-\texttt{polpc} & \textit{police per capita} & $\log(polpc)$ \\
-\texttt{avgsen} & \textit{average sentence, in days} & - \\
-\texttt{taxpc} & \textit{tax revenue per capita} & $\log(taxpc)$ \\
-\texttt{density} & \textit{persons per square mile} & $\sqrt{density}$ \\
-%\texttt{govt_wg} & \textit{mean wage across government sectors} & - \\
-\texttt{pctymle} & \textit{percentage of young males} & $\log(pctymle)$ \\
-\hline
-\end{tabular}
-\end{center}
 
 ``` {r mod_2notransf, echo = FALSE, results = FALSE}
 #Model with our key explanatory variables, and what we suspect to be key covariates
@@ -427,10 +412,19 @@ kable(tidy(model2_trans))
 
 1) One item of interest was the extreme degree of significance we see associated with our percent minority variable (`pctmin80`).  Interestingly, when using only this variable to predict crime rates our $R^2$ is very low; after controlling for other factors, however, this variable becomes extremely important. One way to measure this importance is by calculating the difference between the adjusted $R^2$ values for a model that includes the variable and one that excludes it. When including the minority variable in our model, the adjusted $R^2$ is `r round(summary(model2_trans)$adj.r.squared, 3)`. When excluding it, the adjusted $R^2$ is `r round(summary(model2_trans_no_minvar)$adj.r.squared, 3)`, a difference of `r round(added_adj_r_squared, 3)`
 
-
 2) The square root of the population density is also highly significant. Given the transformation the correct interpretation is that crime activity increases quickly when moving from very small to medium sized population densities, but requires increasingly large levels of population increase to have an effect on crime rate.  
 
 ## Model 3
+
+\textbf{Model 2} yielded greater predictive value than \textbf{Model 1} by including a few extra covariates. \textbf{Model 3} throws in essentially every variable in the dataset.
+
+\begin{align}
+    \texttt{crmrte} = \beta_0 &+ \beta_1\log(\texttt{polpc}) + \beta_2\texttt{prbarr} + \beta_3\texttt{prbconv} + \beta_4\texttt{prbpris}^2 + \beta_5\texttt{avgsen} \tag{Model 1} \nonumber \\
+    &+ \beta_6\log(\texttt{taxpc}) \beta_7\texttt{density} + \beta_8\texttt{pctymle} + \beta_9 \texttt{pctmin80} + \beta_{10} \nonumber \\
+    &+ \beta_{11} + \beta_{12} + \beta_{13} + \beta_{14} \nonumber \\
+    &+ \beta_{15} + \beta_{16} + \beta_{17} + \beta_{18} \tag{Model 2} \nonumber \\ 
+    &+ \beta_{19}\texttt{mix} + \beta_{20}\texttt{central} + \beta_{21}\texttt{west} + \beta_{22}\texttt{urban} + \beta_{23}\texttt{county} + u
+\end{align}
 
 Given the countless ways behavioral issues are interconnected, we wondered whether every variable we had data on might be correlated with either the crime rate or an already included variable in some fashion.  Our focus was to determine if including all our variables substantially changed the significance or corefficient of any of our previously included variables.  Additionally, we wanted to understand if any of the variables we had previously left out were in fact predictive overall. 
 
@@ -465,11 +459,11 @@ Model 3 Notes:
 
 Similarly to model 2, we find that log police per capita, log probability of arrest, log probability of conviction, square root of density, and percent minority are significant.  While model 3 coefficients do change relative to model 2, there are not any drastic changes, or sign (+/-) changes indicating a reversal of effect.
 
-Our adjusted R squared value for this model is `r round(summary(model3_trans)$adj.r.squared, 3)` which does represent a slight, albeit negligible improvement over our previous model.
+Our adjusted R squared value for this model is `r round(summary(model3_trans)$adj.r.squared, 3)` which represents a negligible improvement over our previous model.
 
 ## Model 4
 
-One item we wished to investigate is whether we could build a more parsimonious model by selectively removing variables from our second model which did not appear to be significant.  Note: this is a form of model "dredging" and these results are for comparative purposes only.
+One item we wished to investigate is whether we could build a more parsimonious model by selectively removing variables from our second model which did not appear to be significant.
 
 ``` {r mod_4transforms}
 #Linear model including our key explanatory variables, suspected covariates, and most other variables
@@ -510,7 +504,7 @@ Despite the promising results from our three models it is difficult to ascribe c
 
 5) Police Representation: A community's relationship with the police can vary drastically from place to place.  In recent years certain cities have had significant unrest, with a key element being a majority white police force existing in a largely minority community.  Similar to police methodology, we might expect very different rates of arrest and conviction depending on whether the community feels the police represent them and their interests.
 
-6) Criminals' Perception of Risk-Reward Ratios: Of particular relevance to the Model 1 ("Crime and Punishment") analysis is the issue of criminals' perception of the ``effectiveness'' of the justice system. The model makes two critical assumptions: first, that criminality is driven by rational behavior; second, that criminals have sufficient insight into the outcomes of criminal justice proceedings for their decisions (which we are assuming to be rational) to be informed by them. Obviously if criminals are not of the genus \textit{Homo economicus}, a major theoretical underpinning of the model is removed. However, even if criminals \textit{are} rational actors, they may be operating with imperfect information: they may make the "incorrect" risk-reward calculation if they are unaware of how risky their criminality truly is. For instance, a thief who does not know the District Attorney always \`gets her man' may not be deterred by a high `prbconv` as our model might assume. Similarly, the salience of the potential punishment 
+6) Criminals' Perception of Risk-Reward Ratios: Of particular relevance to the Model 1 ("Crime and Punishment") analysis is the issue of criminals' perception of the \`\`effectiveness'' of the justice system. The model makes two critical assumptions: first, that criminality is driven by rational behavior; second, that criminals have sufficient insight into the outcomes of criminal justice proceedings for their decisions (which we are assuming to be rational) to be informed by them. Obviously if criminals are not of the genus \textit{Homo economicus}, a major theoretical underpinning of the model is removed. However, even if criminals \textit{are} rational actors, they may be operating with imperfect information: they may make the "incorrect" risk-reward calculation if they are unaware of how risky their criminality truly is. For instance, a thief who does not know the District Attorney always \`gets her man' may not be deterred by a high `prbconv` as our model might assume. Similarly, the salience of the potential punishment \textbf{\color{red}{<- TS: Need to finish this thought...}}
 
 7) 
 
@@ -530,6 +524,7 @@ The relationships suggested by our models are intuitive: an increase in the numb
 
 Four of them are simple to interpret: a 1% increase in the number of police is associated with an increase in the crime rate of 11.1 crimes per 100,000 people. Increasing by 1% the probability that a crime report leads to an arrest is associated with a decrease in the crime rate of 15.9 crimes per 100,000 people; a similar increase in the probability of conviction is associated with a decrease in the crime rate of 10.2 crimes per 100,000 people. A 1% increase in the minority share of the population is associated with an increase of 3.8 crimes per 100,000 people. The relationship with the population density is more complex, however, and bears further investigation
 
+\newpage
 # Appendix
 
 \textbf{Detail: scatterplots of variables generated during EDA.}
