@@ -379,11 +379,13 @@ Before we examine the coefficients of our model, we generate our diagnostic plot
 plot(mod1)
 ```
 
-While the mean of the residuals appears to be centered on 0 as we would expect (supporting \textbf{CLM4}), the curvature in our loess smoother suggests that our model may not be correctly specified (violating \textbf{CLM1}). Our residuals appear to be quite normal (supporting \textbf{CLM6}), except at the extremes of our model where few data points are available. We can check for multicollinearity in our model by examining the variance inflation factors (VIF) for each of the predictors we include; a VIF above 5 for any of them would represent cause for concern.
+While the mean of the residuals appears to be centered on 0 as we would expect (supporting \textbf{CLM4}), the curvature in our loess smoother suggests that our model may not be correctly specified (violating \textbf{CLM1}). Our residuals appear to be quite normal (supporting \textbf{CLM6}), except at the extremes of our model where few data points are available. We can confirm or refute that interpretation using the Shapiro-Wilke test for normality and applying it to the residuals.
 
-```{r mod1_vif}
-vif(mod1) # All clear
+```{r mod1_normality_residuals}
+shapiro.test(mod1$residuals)
 ```
+
+The \textit{p}-value of `r round(shapiro.test(mod1$residuals)$p, 3)` indicates that our residuals are not fully normal.
 
 We appear to see some evidence of heteroskedasticity (violating \textbf{CLM5}), indicating a need to apply heteroskedasticity-consistent (\`\`robust'') standard errors.
 
@@ -392,7 +394,15 @@ bptest(mod1) # Breusch-Pagan: heteroskedasticity confirmed
 ncvTest(mod1) # Non-constant variance: heteroskedasticity confirmed
 ```
 
-Having confirmed the heteroskedasticity in our model, we will need to replace the standard errors and the F-statistic with robust versions of themselves. We demonstrate the code here, but will omit it from our discussion of future models.^[See \textit{Appendix} for detailed code]
+Having confirmed the heteroskedasticity in our model, we will need to replace the standard errors and the F-statistic with robust versions of themselves. 
+
+Before we do, however, we can check for multicollinearity in our model by examining the variance inflation factors (VIF) for each of the predictors we include; a VIF above 5 for any of them would represent cause for concern, and indicate that we could likely eliminate that predictor without significant loss of performance by the model.
+
+```{r mod1_vif}
+vif(mod1) # All clear
+```
+
+Having found no indication that we should remove existing predictors from our model, we compute our robust standard errors and F-statistic to add to our reporting. We demonstrate the code here, but will omit it from our discussion of future models.^[See \textit{Appendix} for detailed code]
 
 ```{r mod1_het_corrections}
 mod1_cov <- vcovHC(mod1, type = "HC1")
@@ -417,7 +427,7 @@ stargazer(mod1, header = FALSE, type = "latex",
           notes = "p-values based on Wald test; robust standard errors in parentheses")
 ```
 
-**Comments on Model 1: Crime and Punishment**
+\textbf{Comments on Model 1: Crime and Punishment}
 
 The \textit{p}-value associated with our heteroskedasticity-robust F-test is highly significant, indicating that our model is more predictive than a simple horizontal line at a y-intercept would be. The adjusted $R^2$ of our model is `r round(mod1_summ$adj.r.squared, 3)`, which is pretty good.
 
@@ -437,7 +447,7 @@ We highlight four main observations:
 
 \begin{align}
     \texttt{crmrte} = \beta_0 &+ \beta_1\log(\texttt{polpc}) + \beta_2\log(\texttt{prbarr}) + \beta_3\log(\texttt{prbconv}) + \beta_4\texttt{prbpris} + \beta_5\texttt{avgsen} \tag{Model 1} \nonumber \\
-    &+ \beta_6\log(\texttt{taxpc}) + \beta_7\texttt{sqrt\_density} + \beta_8\texttt{pctymle} + \beta_9 \texttt{pctmin80} \nonumber \\
+    &+ \beta_6\log(\texttt{taxpc}) + \beta_7\sqrt{\texttt{density}} + \beta_8\texttt{pctymle} + \beta_9 \texttt{pctmin80} \nonumber \\
     &+ \beta_{10}\texttt{wcon} + \beta_{11}\texttt{wtuc} + \beta_{12}\texttt{wtrd} + \beta_{13}\texttt{wfir} + \beta_{14}\texttt{wser} \nonumber \\
     &+ \beta_{15}\texttt{wmfg} + \beta_{16}\texttt{wfed} + \beta_{17}\texttt{wsta} + \beta_{18}\texttt{wloc} + u
 \end{align}
@@ -478,15 +488,9 @@ crime_na$industry_wg <- (crime_na$wfir+crime_na$wtrd+crime_na$wtuc)/3
 ``` {r mod2_b, echo = TRUE, results = TRUE}
 #Model with our key explanatory variables, and what we suspect to be key covariates
 mod2_b <- with(crime_na, lm(crmrte ~ log(polpc) + log(prbarr) + log(prbconv) +
-                            prbpris + avgsen + log(taxpc) + sqrt_density + pctymle +
+                            prbpris + avgsen + log(taxpc) + sqrt(density) + pctymle +
                             pctmin80 +
                             wcon + wtuc + wtrd + wfir + wser + wmfg + wfed + wsta + wloc))
-
-mod2_b_nomin <- with(crime_na, lm(crmrte ~ log(polpc) + log(prbarr) + log(prbconv) + 
-                            prbpris + avgsen + log(taxpc) + sqrt_density + pctymle +
-                            wcon + wtuc + wtrd + wfir + wser + wmfg + wfed + wsta + wloc))
-
-min_ars_diff <- summary(mod2_b)$adj.r.squared - summary(mod2_b_nomin)$adj.r.squared
 
 #Adding AIC to our model to help us compare models in the future.
 mod2_b$AIC <- AIC(mod2_b)
@@ -500,20 +504,33 @@ Before we examine the coefficients of our model, we generate our diagnostic plot
 plot(mod2_b)
 ```
 
-Overall, the most salient feature of these diagnostic plots is how similar they are to the plots for \textbf{Model 1}. The plot of residuals vs. fitted values continues to suggest that the model is improperly specified, although perhaps marginally less so than before. The only striking difference is that two observations - for counties $25$ and $84$ - are now both high-leverage and high-influence, with Cook's distances of $>0.5$ and $>1.0$ respectively.
+Overall, the most salient feature of these diagnostic plots is how similar they are to the plots for \textbf{Model 1}. The plot of residuals vs. fitted values continues to suggest that the model is improperly specified, although perhaps marginally less so than before. The only striking difference is that two observations - for the counties at indices $25$ and $84$ - are now both high-leverage and high-influence, with Cook's distances of $>0.5$ and $>1.0$ respectively. Which counties might those represent?
 
-```{r mod2_b_vif}
+```{r mod2_highleverage}
+crime_na[c(25,84),c(1:10)]
+crime_na[c(25,84),c(14:23,25)]
+```
+
+Interestingly, neither of those is county $115$, which had been the county we flagged as having outliers in \texttt{crmrte}, \texttt{prbarr}, and \texttt{polpc}. However, we can see that county $185$ is the one with the exceedingly high \texttt{wser}.
+
+```{r mod2_normality_residuals, echo = FALSE, results = "hide"}
+shapiro.test(mod2_b$residuals)
+```
+
+While the plot suggests that our residuals again deviate from normality at the extremes, this time, the Shapiro-Wilke test of our residuals (\textit{p} = `r round(shapiro.test(mod2_b$residuals)$p, 3)`) suggests that they are normally distributed (supporting \textbf{CLM6}).
+
+```{r mod2_b_vif, echo = FALSE, results = "hide"}
 vif(mod2_b) # All clear
 ```
 
-Our analysis of the VIFs indicates that multicollinearity has increased slightly, but not yet to the point where our rule of thumb (excluding covariates with VIF $>5$) would come into play.
+Our analysis of the VIFs indicates that multicollinearity has increased slightly (median = `r round( median(vif(mod2_b)), 2)`, mean = `r round(mean(vif(mod2_b)), 2)` max = `r round(max(vif(mod2_b)), 2)`), but not yet to the point where our rule of thumb (excluding covariates with VIF $>5$) would come into play.
 
-```{r mod2_b_heteroskedasticity}
+```{r mod2_b_heteroskedasticity, echo = FALSE, results = "hide"}
 bptest(mod2_b) # Breusch-Pagan: heteroskedasticity confirmed
 ncvTest(mod2_b) # Non-constant variance: heteroskedasticity confirmed
 ```
 
-As with \textbf{Model 1}, graphical indications of heteroskedasticity (violating \textbf{CLM5}) are confirmed by Breusch-Pagan and non-constant variance diagnostic tests, indicating a need to apply heteroskedasticity-consistent (\`\`robust'') standard errors.^[See \textit{Appendix} for the detailed code showing the calculation of those SEs]
+As with \textbf{Model 1}, graphical indications of heteroskedasticity (violating \textbf{CLM5}) are confirmed by Breusch-Pagan ($\textit{p} \approx$ `r format(round(bptest(mod2_b)$p.value, 5), scientific = FALSE)`) and non-constant variance ($\textit{p} \approx$ `r format(round(ncvTest(mod2_b)$p, 5), scientific = FALSE)`) diagnostic tests, indicating a need to apply heteroskedasticity-consistent (\`\`robust'') standard errors.^[See \textit{Appendix} for the detailed code showing the calculation of those SEs]
 
 ```{r mod2_b_het_corrections, echo = FALSE}
 mod2_b_cov <- vcovHC(mod2_b, type = "HC1")
@@ -526,7 +543,7 @@ mod2_b_wp <- formatC(mod2_b_wald$`Pr(>F)`[2], format="e", digits = 2)
 mod2_b_summ <- summary.lm(mod2_b)
 ```
 
-``` {r mod2_b_coeff_output, results = "asis"}
+``` {r mod2_b_coeff_output, echo = FALSE, results = "asis"}
 #Output model results in nice format using tidy and kable
 # kable(tidy(mod1)) # <- TS: Superfluous b/c need RSE, so stargazer
 stargazer(mod2_b, header = FALSE, type = "latex",
@@ -538,11 +555,64 @@ stargazer(mod2_b, header = FALSE, type = "latex",
           notes = "p-values based on Wald test; robust standard errors in parentheses")
 ```
 
-\textbf{Comments on Model 2}:
+\textbf{Comments on Model 2: Demography and Economics}
 
-1) One item of interest was the extreme degree of significance we see associated with our percent minority variable (`pctmin80`).  Interestingly, when using only this variable to predict crime rates our $R^2$ is very low; after controlling for other factors, however, this variable becomes extremely important. One way to measure this importance is by calculating the difference between the adjusted $R^2$ values for a model that includes the variable and one that excludes it. When including the minority variable in our model, the adjusted $R^2$ is `r round(summary(mod2_b)$adj.r.squared, 3)`. When excluding it, the adjusted $R^2$ is `r round(summary(mod2_b_nomin)$adj.r.squared, 3)`, a difference of `r 100*round(min_ars_diff, 3)` percentage points.
+There are a few observations to make with respect to \textbf{Model 2}.
 
-2) The square root of the population density is also highly significant. Given the transformation the correct interpretation is that crime activity increases quickly when moving from very small to medium sized population densities, but requires increasingly large levels of population increase to have an effect on crime rate.  
+  1) First, all of the predictors that were significant under \textbf{Model 1} remained so under this expanded model. While the magnitude of their coefficients has uniformly decreased, the signs (indicating the direction of the relationship) have remained the same.
+
+  2) One item of interest was the extreme degree of significance we see associated with our percent minority variable (\texttt{pctmin80}).  Interestingly, when using only this variable to predict crime rates our $R^2$ is very low; after controlling for other factors, however, this variable becomes extremely important. One way to measure this importance is by calculating the difference between the adjusted $R^2$ values for a model that includes the variable and one that excludes it. 
+
+```{r mod2_nominority}
+mod2_b_nomin <- with(crime_na, lm(crmrte ~ log(polpc) + log(prbarr) + log(prbconv) + 
+                            prbpris + avgsen + log(taxpc) + sqrt(density) + pctymle +
+                            wcon + wtuc + wtrd + wfir + wser + wmfg + wfed + wsta + wloc))
+
+min_ars_diff <- summary(mod2_b)$adj.r.squared - summary(mod2_b_nomin)$adj.r.squared
+```
+
+  When including the minority variable in our model, the adjusted $R^2$ is `r round(summary(mod2_b)$adj.r.squared, 3)`. When excluding it, the adjusted $R^2$ is `r round(summary(mod2_b_nomin)$adj.r.squared, 3)`, a difference of `r 100*round(min_ars_diff, 3)` percentage points.
+
+  3) The square root of the population density is also highly significant. This suggests that the observed crime rate grows quickly as the population density changes from very low (sparsely populated) to medium density, but beyond a certain point each additional person per square mile should influence our prediction of the crime rate less and less.  
+
+  4) In this model, the wages associated with the service industry (\texttt{wser}) have become significant. This is somewhat unexpected - why should a single industry's wages matter, when others do not? We recall that the service industry in county $185$ had a weekly average wage nearly 10 times that of the other industries - and also that our diagnostic plots showed that it had a Cook's distance > 1. We can re-run this model with a dataset that excludes county $185$ to see if the finding holds when the outlier is removed.
+  
+```{r mod2_bnout}
+mod2_bnout <- lm(crmrte ~ log(polpc) + log(prbarr) + log(prbconv) +
+             prbpris + avgsen + log(taxpc) + sqrt(density) + pctymle +
+             pctmin80 +
+             wcon + wtuc + wtrd + wfir + wser + wmfg + wfed + wsta + wloc,
+             data = subset(crime_na, county != max(county)))
+mod2_bnout$AIC <- AIC(mod2_bnout)
+```
+
+```{r mod2_bnout_het_corrections, echo = FALSE}
+mod2_bnout_cov <- vcovHC(mod2_bnout, type = "HC1")
+mod2_bnout_pvals <- list(coeftest(mod2_bnout, vcov = mod2_bnout_cov)[,4])
+mod2_bnout_robse  <- list(sqrt(diag(mod2_bnout_cov)))
+mod2_bnout_wald <- waldtest(mod2_bnout, vcov = mod2_bnout_cov)
+mod2_bnout_wDf <- mod2_bnout_wald$Df[2]
+mod2_bnout_wF <- round(mod2_bnout_wald$F[2], 2)
+mod2_bnout_wp <- formatC(mod2_bnout_wald$`Pr(>F)`[2], format="e", digits = 2)
+mod2_bnout_summ <- summary.lm(mod2_bnout)
+```
+
+```{r mod2_b_w_mod2_bnout, results="asis"}
+stargazer(mod2_b, mod2_bnout, header = FALSE, type = "latex",
+          column.labels = c("All Obs", "Excl. 185"),
+          se = c(mod2_b_robse, mod2_bnout_robse), p = c(mod2_b_pvals, mod2_bnout_pvals),
+          report="vc*s", star.cutoffs = c(0.05, 0.01, 0.001),
+          title = "Model 2: Demography and Economics", single.row = TRUE,
+          omit.stat = "f",
+          add.lines = list(c("F Statistic", mod2_b_wF, mod2_bnout_wF), c("Pr(>F)", mod2_b_wp, mod2_bnout_wp)),
+          notes = "p-values based on Wald test; robust standard errors in parentheses")
+```
+
+Indeed, we see that it does. Practically speaking, however, it is unclear whether the magnitude of the effect is significant. It suggests that a one-unit (i.e., one dollar) increase in the average weekly service-sector wage is associated with a change of `r round(10000 * (mod2_b$coefficients[15]), 2)` (i.e., decrease) in the number of crimes per 10,000 people, which in turn implies that an additional \$10/week would be associated with one fewer crime. While \$10 over the course of the week doesn't sound like much, the average across all counties is only \$`r round(mean(crime_na$wser, na.rm = TRUE), 2)`; such an increase would be the equivalent of a `r round(100*(10/mean(crime_na$wser, na.rm = TRUE)), 2)`\% raise across the entire sector.
+
+Applying our interpretive lens to $\sqrt{\texttt{density}}$ is not so straightforward. This is one of the tradeoffs we make for improving our model fit: we may sacrifice the ability to easily explain the effect. So we will not attempt to explain it beyond the earlier observation that at higher population densities, each marginal person per square mile modifies our prediction of crime rate less and less.
+
+The \texttt{pctmin80} interpretation is more straightforward, although again it is important to recall that our model is merely predictive and does not provide causal explanations. Each increase in the percentage of minorities in the population in 1980 is associated with `r round(10000 * (mod2_b$coefficients[10]), 2)` more crimes per 10,000 people.
 
 ## Model 3
 
@@ -550,7 +620,7 @@ stargazer(mod2_b, header = FALSE, type = "latex",
 
 \begin{align}
     \texttt{crmrte} = \beta_0 &+ \beta_1\log(\texttt{polpc}) + \beta_2\log(\texttt{prbarr}) + \beta_3\texttt{prbconv} + \beta_4\texttt{prbpris} + \beta_5\texttt{avgsen} \tag{Model 1} \nonumber \\
-    &+ \beta_6\log(\texttt{taxpc}) + \beta_7\texttt{sqrt\_density} + \beta_8\texttt{pctymle} + \beta_9 \texttt{pctmin80} \nonumber \\
+    &+ \beta_6\log(\texttt{taxpc}) + \beta_7\sqrt{\texttt{density}} + \beta_8\texttt{pctymle} + \beta_9 \texttt{pctmin80} \nonumber \\
     &+ \beta_{10}\texttt{wcon} + \beta_{11}\texttt{wtuc} + \beta_{12}\texttt{wtrd} + \beta_{13}\texttt{wfir} + \beta_{14}\texttt{wser} \nonumber \\
     &+ \beta_{15}\texttt{wmfg} + \beta_{16}\texttt{wfed} + \beta_{17}\texttt{wsta} + \beta_{18}\texttt{wloc} \tag{Model 2} \nonumber \\ 
     &+ \beta_{19}\texttt{mix} + \beta_{20}\texttt{central} + \beta_{21}\texttt{west} + \beta_{22}\texttt{urban} + \beta_{23}\texttt{county} + u
@@ -572,8 +642,13 @@ mod3$AIC <- AIC(mod3)
 kable(tidy(mod3))
 ```
 
-```{r mod3_trans_diag}
-crPlots(mod3)
+```{r mod3_trans_diag, out.width="50%"}
+plot(mod3)
+```
+
+
+```{r mod3_normality_residuals, echo = FALSE}
+shapiro.test(mod3$residuals)
 ```
 
 Model 3 Notes:
