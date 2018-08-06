@@ -45,11 +45,6 @@ crime_raw <- read_csv('crime_v2.csv', col_types = cols(prbconv = col_double()))
 ```
 We begin by exploring our dataset. We see that it has `r dim(crime_raw)[1]` records and `r dim(crime_raw)[2]` variables.
 
-```{r initial_look}
-dim(crime_raw)
-names(crime_raw)
-```
-
 The notes we receive provide the following insight into the variables:
 \begin{center} % https://community.rstudio.com/t/inserting-table-in-r-markdown/7260/4
 \captionof{table}{Available Variables from Cornwell \& Trumball (1994)}
@@ -127,34 +122,6 @@ The notes on `prbarr` indicate \textit{the probability of arrest is proxied by t
 
 In both cases, there are plausible explanations for a probability value in excess of 1. However, one of the observations appears to be an outlier. The county labeled `115` has the lowest crime rate by far (~50\% lower than that of any other county), the highest `probability' of arrest (>1 arrest per offense, nearly 58% greater than the county with the second-highest probability), the longest average sentence (20.7 days, ~15\% higher than the second-longest), and the largest number of police per capita (9 officers per 1,000 residents, more than twice as many as the second-highest county). While those numbers appear unusual, they are also internally consistent: one would expect a very low crime rate from a county that has a very strong police presence, arrests a large proportion of suspects, and punishes convicted criminals severely.^[Discussion with peers and further research reveals that the county labels are, in fact, \href{https://en.wikipedia.org/wiki/Federal_Information_Processing_Standard}{FIPS (Federal Information Processing Standard) codes}. A deep dive into additional county-level contextual factors that could inform our analyses is beyond the scope of this report; we leave it as an exercise for the reader.]
 
-## Overview of Scatterplots
-
-We generate a series of scatterplots that we use to examine the relationships between our variable of interest, `crmrte`, and the other variables in the dataset. We present the code and a pair of example plots below, but full results are omitted for parsimony.^[See \textit{Appendix} for the remainder of the graphs.]
-
-```{r scatterplots, results = "hide", out.width = "50%"}
-make_scatters <- function(df, var_list, y, trans) {
-  if(!missing(trans)) {
-    var_list <- append(var_list, str_glue('{trans}({var_list})'))
-  }
-  for (v in var_list){
-  print(ggplot(df, aes_string(x = v, y = y)) +
-          geom_point() + 
-          geom_smooth(method = 'lm', se = FALSE) +
-          xlab(v) +
-          ylab(substitute(y)) +
-          ggtitle(str_glue('{y} vs {v}'))
-        )
-    } 
-}
-make_scatters(crime_raw, c("prbarr", "taxpc"), "crmrte")
-```
-
-
-
-``` {r remove_outlier, include = FALSE}
-# crime_na <- crime_na[crime_na$prbarr<=1,] # TS: I have commented this out, as we now know the outlier makes sense.
-```
-
 ```{r eda_plausibility_checks, echo = FALSE, results = "hide", fig.show = "hide"}
 plot(density(crime_na$year)) # TS: Confirmed all 1987
 plot(density(crime_na$crmrte)) # TS: Confirmed all positive
@@ -192,55 +159,83 @@ outlier_wser[,c(1,15:ncol(outlier_wser))]
 mean_other_wage <- with(outlier_wser, mean(wcon, wtuc, wtrd, wmfg, wfed, wsta, wloc))
 ```
 
-It is improbable, but not impossible, that individuals in the service industry are making `r round(outlier_wser$wser/mean_other_wage, 2)`X more than the average wage of all other workers in the county.  It seems more likely that a keystroke error was made in the recording of this variable (e.g., `r round(outlier_wser$wser, 2)` $\rightarrow$ `r round(outlier_wser$wser/10, 2)`). \textbf{\color{red}{As we get into model-building we will check whether this particular value exerts undue influence on our results.}}
+It is improbable, but not impossible, that individuals in the service industry are making `r round(outlier_wser$wser/mean_other_wage, 2)`X more than the average wage of all other workers in the county.  It seems more likely that a keystroke error was made in the recording of this variable (e.g., `r round(outlier_wser$wser, 2)` $\rightarrow$ `r round(outlier_wser$wser/10, 2)`). As we get into model-building we will check whether this particular value exerts undue influence on our results.
 
 The other \`\`outliers'' we see are the values associated with county `115` discussed above, but those are neither as extreme nor inconsistent with theory.
 
 ## Transformation Analysis
 
-If the relationship between two variables is not linear, adding them to a linear regression model as-is (without a transformation) will generate inaccurate results and possibly result in an invalidation of our heteroskedasticity assumption. It is therefore important to explore whether the relationship between two variables shares some non-linear relationship and thus whether a transformation is required. As part of our EDA we explored this question for all of the variables in the dataset.
+If the relationship between two variables is not linear, adding them to a linear regression model as-is (without a transformation) will generate inaccurate results and possibly result in an invalidation of our heteroskedasticity and zero conditional mean assumptions. It is therefore important to explore whether the relationship between two variables shares some non-linear relationship and thus whether a transformation is required. As part of our EDA we explored this question for all of the variables in the dataset.
 
 Our first step was to evaluate if any variables had significant skew in their distributions by checking whether they generally conformed to a normal distribution using R's qqplot.  While this is not necessarily a reason to transform a variable, it can help us identify variables of interest. Below we present the code we used to generate the series of graphs as well as two sample graphs for illustrative purposes.^[See \textit{Appendix} for the remainder of the graphs.]
 
-\textbf{\color{red}{TS: Karl, I'm really struggling with this. Please rescue me!}}
-
 ``` {r skewed_variables, echo=TRUE, results="hide", fig.show = "hide"}
-for (i in 1:length(colnames(crime_na))){
-  column_interest <- paste("crime_na$",colnames(crime_na)[i],sep='')
-  qqnorm(eval(parse(text=column_interest)),main=colnames(crime_na)[i])
+make_qqs <- function(df, var_list, trans) {
+  var_list_new <- c()
+  for (var in var_list){
+    var_list_new <- append(var_list_new, str_glue('{df}${var}'))
+    
+    if(!missing(trans)) {
+    var_list_new <- append(var_list_new, str_glue('{trans}({df}${var})'))
+    }
+  }
+
+  for (col in var_list_new){
+    title <- str_glue('QQ Plot Demonstrating the Normality of {col}')
+    qqnorm(eval(parse(text=col)), main = title)
+    qqline(eval(parse(text=col)))
+  }
 }
+
 ```
 
 ```{r skewed_variables_illustrative, out.width="50%"}
-qqnorm(crime_na$prbconv, main = "Normality of prbconv"); qqline(crime_na$prbconv); qqnorm(log(crime_na$prbconv), main = "Normality of log(prbconv)"); qqline(log(crime_na$prbconv))
+make_qqs('crime_na', 'prbconv', 'log')
 ```
 
 From our graphs we saw that probability of conviction (`prbconv`), police per capita (`polpc`), probability of arrest (`prbarr`), tax revenue per capita (`taxpc`), population density (`density`), proportion of young males in the population (`pctymle`), and the mix of face-to-face vs. impersonal crimes (`mix`) all deviated from normality.  We will consider this in addition to other factors when deciding if a transformation would be beneficial.  
 
 ## Checking for Linearity Between Predictor and Response Variables
 
-While it is not a perfect approach due to the possible interactions amongst variables, we also wanted to look at whether there is any obvious non-linearity  when looking at crime rate and each variable independently.  To do this we looked at a scatterplot of crime rate vs. each variable, and then applied various transformations to see whether those would improve the distribution. We present sample code and an illustrative graph here as an example.^[See \textit{Appendix} for remaining graphs.]
+While it is not a perfect approach due to the possible interactions amongst independent variables, we also wanted to look at whether there is any obvious non-linearity  when looking at crime rate and each variable independently.  To do this we looked at a scatterplot of crime rate vs. each variable, and then applied various transformations to see whether those would improve the distribution. We present sample code and an illustrative graph here as an example.^[See \textit{Appendix} for remaining graphs.]
 
-\textbf{\color{red}{TS: Karl, I'm really struggling with this. Please rescue me!}}
-
-``` {r relationship_of_interest, echo=TRUE, results="hide", fig.show = "hide"}
-for (i in 1:length(colnames(crime_na))){
-  column_interest <- paste("crime_na$",colnames(crime_na)[i],sep='')
-  plot(eval(parse(text=column_interest)),crime_na$crmrte,main=colnames(crime_na)[i],
-       ylab="Crime Rate",xlab=colnames(crime_na)[i])
+``` {r relationship_of_interest, echo=TRUE, out.width = "50%"}
+make_scatters <- function(df, var_list, y, trans) {
+  if(!missing(trans)) {
+    var_list <- append(var_list, str_glue('{trans}({var_list})'))
+  }
+  for (v in var_list){
+  print(ggplot(df, aes_string(x = v, y = y)) +
+          geom_point() + 
+          geom_smooth(method = 'lm', se = FALSE) +
+          xlab(v) +
+          ylab(substitute(y)) +
+          ggtitle(str_glue('{y} vs {v}'))
+        )
+    } 
 }
-```
-
-```{r relationship_of_interest_illustrative, out.width = "50%"}
-with(crime_na, plot(prbconv, polpc), title = "Crime Rate v Police Per Capita")
-with(crime_na, plot(prbconv, log(polpc)), title = "Crime Rate v log(Police per capita)")
+make_scatters(crime_raw, c("prbarr", "prbconv", "polpc", "density", "taxpc"), "crmrte")
 ```
 
 Reviewing these graphs yields five (5) variables which appear to have a non-linear relationship with crime rate: `prbarr`, `prbconv`, `polpc`, `density`, and `taxpc`.  While it is not particularly important that predictor variables be normally distributed, we do want them to display both \textit{symmetry} and \textit{high variance}; to the extent applying a transformation advances those goals, it is worth considering provided it does not inhibit interpretability or run strongly counter to theory.
 
-Four of the variables appear to benefit from a log transform, while the fifth (`density`) appears to be related to crime rate via the square root function.  The pre- and post-transformation scatterplots and q-q plots for `prbconv` are presented here for illustrative purposes.^[See \textit{Appendix} for the others.] \textbf{\color{red}{TS: Karl, I'm really struggling with this. Please rescue me!}}
+Four of the variables appear to benefit from a log transform, while the fifth (`density`) appears to be related to crime rate via the square root function.  The pre- and post-transformation scatterplots and q-q plots for `prbconv` are presented here for illustrative purposes.^[See \textit{Appendix} for the others.] 
 
-In addition to checking whether the relationship appeared to improve in linearity, we also checked whether this transformation helped with variable skew.  In every case the distribution of our variable moved closer to normality. \textbf{\color{red}{Given the improvement in linearity and normality we will use these transformations moving forward. <- TS: Given what we now know about not needing to transform dependent variables unless it helps with our need for symmetry and high variability, do we still want to do this?}}
+```{r prbconv_scatters, out.width = "50%"}
+make_qqs(df = 'crime_na', var_list = 'prbconv', trans = 'log')
+make_scatters(df = crime_na, var_list = 'prbconv', y = 'crmrte', trans = 'log')
+```
+
+In addition to checking whether the relationship appeared to improve in linearity, we also checked whether this transformation helped with variable skew.  In every case the distribution of our variable moved closer to normality.  The interpretation of a log transformation is that a percentage change in the independent variable (for small changes <20%) will illict a constant change in the independent variable. A square root transformation has a slope which decays asymptotically to zero, so the effect dampens as the values become larger.  In the case of `density`, this represents that increased density in cities may not have as large of an effect. Given the improvement in linearity and normality we will use these transformations moving forward. 
+```{r}
+ggplot(crime_na, aes(x = density, fill = factor(urban))) +
+  geom_histogram() +
+  xlab('Density') +
+  ylab('Frequency') +
+  ggtitle('Density Histogram') +
+  scale_fill_discrete(name = "Urban")
+ 
+```
 
 ```{r linearity1, out.width='50%', echo = FALSE}
 #make_scatters(df = crime_na, var_list = c('prbarr'), y = 'crmrte', trans = 'log')
@@ -303,7 +298,7 @@ In order to answer our research question we created several models which include
 
 \textbf{Theme 1: Crime and Punishment}
 
-Our first theme revolves around crime and the likelihood of punishment resulting from the act of committing a crime. We believe that the variables police per capita (`polpc`), probability of arrest (`prbarr`), probability of conviction (`prbconv`), probability of incarceration (`prbpris`), and average sentence length (`avgsen`) fit well together. Taken comprehensively, they help frame the observed crime rate in economic terms as a sort of "risk-reward" proposition for would-be criminals: is the presence of a well-functioning criminal justice system^[Using an admittedly naïve formulation in which socioeconomic status, racial bias, and predatory policing are assumed to be non-issues.]—in which crimes consistently lead to arrests (of the actual perpetrators, and not innocent bystanders), and arrests consistently lead to (warranted) convictions, and convictions lead to prison sentences, and sentences are indeed punitive—predictively associated with the crime rate? 
+Our first theme revolves around crime and the likelihood of punishment resulting from the act of committing a crime. We believe that the variables police per capita (`polpc`), probability of arrest (`prbarr`), probability of conviction (`prbconv`), probability of incarceration (`prbpris`), and average sentence length (`avgsen`) fit well together. Taken comprehensively, they help frame the observed crime rate in economic terms as a sort of "risk-reward" proposition for would-be criminals: is the presence of a well-functioning criminal justice system^[Using an admittedly naive formulation in which socioeconomic status, racial bias, and predatory policing are assumed to be non-issues.]in which crimes consistently lead to arrests (of the actual perpetrators, and not innocent bystanders), and arrests consistently lead to (warranted) convictions, and convictions lead to prison sentences, and sentences are indeed punitive, predictively associated with the crime rate? 
 
 The variables in this theme are particularly valuable because they provide a solid foundation for policy development. If the size of the police force is associated with changes in the crime rate, it can be scaled up or scaled down appropriately. If the probability of arrest makes a difference, the county could invest in improving community-police relationships with the goal of improving the speed with which crimes are reported and the quality of the actionable intelligence witnesses provide. If the probability of conviction is important, funds could be invested in further training the police and District Attorneys on the collection and presentation of evidence. If the probability of incarceration and average sentence are important, legislators could advocate for changes to sentencing guidelines.
 
@@ -385,7 +380,7 @@ While the mean of the residuals appears to be centered on 0 as we would expect (
 shapiro.test(mod1$residuals)
 ```
 
-The \textit{p}-value of `r round(shapiro.test(mod1$residuals)$p, 3)` indicates that our residuals are not fully normal.
+The \textit{p}-value of `r round(shapiro.test(mod1$residuals)$p, 3)` indicates that our residuals are not fully normal, however, significance is not an unexpected result with our somewhat large dataset.
 
 We appear to see some evidence of heteroskedasticity (violating \textbf{CLM5}), indicating a need to apply heteroskedasticity-consistent (\`\`robust'') standard errors.
 
