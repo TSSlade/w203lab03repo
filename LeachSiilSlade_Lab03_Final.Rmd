@@ -694,6 +694,7 @@ stargazer(mod1, mod2_b, mod3,
           title = "Linear Models Predicting Crime Rate", single.row = TRUE,
           keep.stat = c("aic", "rsq","adj.rsq","n"), omit.table.layout = "n")
 ```
+\pagebreak
 
 ## Omitted Variables
 
