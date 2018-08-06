@@ -154,6 +154,7 @@ Examining the remainder of our data, we found no substantial evidence of _top-co
 We see a handful of outliers. In `wser`, the variable indicating the county's weekly wage in the service industry, we find that county `r filter(crime_na, crime_na$wser ==max(crime_na$wser))["county"]` is an extreme outlier.  To determine if this is valid we looked at the wage values in that county for other sectors of the economy.
 
 ```{r outlier_check_wser}
+#Analysis of outliers
 outlier_wser <- filter(crime_na, crime_na$wser==max(crime_na$wser))
 outlier_wser[,c(1,15:ncol(outlier_wser))]
 mean_other_wage <- with(outlier_wser, mean(wcon, wtuc, wtrd, wmfg, wfed, wsta, wloc))
@@ -167,7 +168,7 @@ The other \`\`outliers'' we see are the values associated with county `115` disc
 
 If the relationship between two variables is not linear, adding them to a linear regression model as-is (without a transformation) will generate inaccurate results and possibly result in an invalidation of our heteroskedasticity and zero conditional mean assumptions. It is therefore important to explore whether the relationship between two variables shares some non-linear relationship and thus whether a transformation is required. As part of our EDA we explored this question for all of the variables in the dataset.
 
-Our first step was to evaluate if any variables had significant skew in their distributions by checking whether they generally conformed to a normal distribution using R's qqplot.  While this is not necessarily a reason to transform a variable, it can help us identify variables of interest. Below we present the code we used to generate the series of graphs as well as two sample graphs for illustrative purposes.^[See \textit{Appendix} for the remainder of the graphs.]
+Our first step was to evaluate if any variables had significant skew in their distributions by checking whether they generally conformed to a normal distribution using R's qqplot.  While this is not necessarily a reason to transform a variable, it helped us identify variables of interest. Below we present the code we used to generate the series of graphs as well as two sample graphs for illustrative purposes.^[See \textit{Appendix} for the remainder of the graphs.]
 
 ``` {r skewed_variables, echo=TRUE, results="hide", fig.show = "hide"}
 make_qqs <- function(df, var_list, trans) {
@@ -226,7 +227,10 @@ make_qqs(df = 'crime_na', var_list = 'prbconv', trans = 'log')
 make_scatters(df = crime_na, var_list = 'prbconv', y = 'crmrte', trans = 'log')
 ```
 
-In addition to checking whether the relationship appeared to improve in linearity, we also checked whether this transformation helped with variable skew.  In every case the distribution of our variable moved closer to normality.  The interpretation of a log transformation is that a percentage change in the independent variable (for small changes <20%) will illict a constant change in the independent variable. A square root transformation has a slope which decays asymptotically to zero, so the effect dampens as the values become larger.  In the case of `density`, this represents that increased density in cities may not have as large of an effect. Given the improvement in linearity and normality we will use these transformations moving forward. 
+In addition to checking whether the relationship appeared to improve in linearity, we also checked whether this transformation helped with variable skew.  In every case the distribution of our variable moved closer to normality.  
+
+With regards to interpretability, the interpretation of a log transformation is that a percentage change in the independent variable (for small changes <20%) will illict a constant change in the dependent variable. A square root transformation has a slope which decays asymptotically to zero, so the effect dampens as the values become larger.  In the case of `density`, this represents that increased density in cities may not have as large of an effect. Given the improvement in linearity and normality we will use these transformations moving forward. 
+
 ```{r}
 ggplot(crime_na, aes(x = density, fill = factor(urban))) +
   geom_histogram() +
@@ -288,7 +292,7 @@ Finally, we examined collinearity between various variables that we thought woul
 
 # Research Question and Model-Building
 
-Our candidate seeks to develop a policy platform to address crime in NC. However, she knows that both the state's resources and her polical capital are limited, so she would like to know how to prioritize her efforts to achieve maximal impact. Our \textbf{research question} is thus the following: \textit{What is a small number of factors which are jointly highly predictive of the observable crime rate which our candidate should seek to address through legislation?} 
+Our candidate seeks to develop a policy platform to address crime in NC. However, she knows that both the state's resources and her political capital are limited, so she would like to know how to prioritize her efforts to achieve maximal impact. Our \textbf{research question} is thus the following: \textit{What is a small number of factors which are jointly highly predictive of the observable crime rate which our candidate should seek to address through legislation?} 
 
 We face a key limitation: our data does not give us visibility into the crimes themselves or changes in crime, but rather provides only the official _crime rate_. The crime rate is a function not only of crimes committed but also of various additional factors, some of which may be unobservable. For instance, poor community-police relations may bias crime rates downward if an area's residents \href{https://www.washingtonpost.com/news/acts-of-faith/wp/2018/04/19/churches-make-a-drastic-pledge-in-the-name-of-social-justice-to-stop-calling-the-police/?utm_term=.ac2ea8ee1523}{\textbf{\color{blue}{do not report all the crimes they observe or experience}}}. Conversely, those poor relations may also bias crime rates upward if police officers engage in \href{https://www.huffingtonpost.com/2015/05/04/st-louis-county-predatory-policing_n_7201964.html}{\textbf{\color{blue}{predatory policing practices}}} and the community lacks the wherewithal to fight back.  A full discussion of omitted variable bias will occur later in this analysis, but we preface our model-building section with this note to as a practical way to invite the reader to critically examine the models we propose.
 
@@ -300,7 +304,7 @@ In order to answer our research question we created several models which include
 
 Our first theme revolves around crime and the likelihood of punishment resulting from the act of committing a crime. We believe that the variables police per capita (`polpc`), probability of arrest (`prbarr`), probability of conviction (`prbconv`), probability of incarceration (`prbpris`), and average sentence length (`avgsen`) fit well together. Taken comprehensively, they help frame the observed crime rate in economic terms as a sort of "risk-reward" proposition for would-be criminals: is the presence of a well-functioning criminal justice system^[Using an admittedly naive formulation in which socioeconomic status, racial bias, and predatory policing are assumed to be non-issues.]in which crimes consistently lead to arrests (of the actual perpetrators, and not innocent bystanders), and arrests consistently lead to (warranted) convictions, and convictions lead to prison sentences, and sentences are indeed punitive, predictively associated with the crime rate? 
 
-The variables in this theme are particularly valuable because they provide a solid foundation for policy development. If the size of the police force is associated with changes in the crime rate, it can be scaled up or scaled down appropriately. If the probability of arrest makes a difference, the county could invest in improving community-police relationships with the goal of improving the speed with which crimes are reported and the quality of the actionable intelligence witnesses provide. If the probability of conviction is important, funds could be invested in further training the police and District Attorneys on the collection and presentation of evidence. If the probability of incarceration and average sentence are important, legislators could advocate for changes to sentencing guidelines.
+The variables in this theme are particularly valuable because they provide a solid foundation for policy development. If the size of the police force is associated with changes in the crime rate, it can be scaled up or scaled down appropriately. If the probability of arrest is impactful, the county could invest in improving community-police relationships with the goal of improving the speed with which crimes are reported and the quality of the intelligence witnesses provide. If the probability of conviction is important, funds could be invested in further training the police and District Attorneys on the collection and presentation of evidence. If the probability of incarceration and average sentence are important, legislators could advocate for changes to sentencing guidelines.
 
 \textbf{Theme 2: Demography and Economics}
 
@@ -312,7 +316,7 @@ The police force is funded by the local government, which in turn is funded by t
 
 The dataset contains nine variables related to wage: `wfed`, `wsta`, `wloc`, `wmfg`, `wser`, `wcon`, `wfir`, `wtrd`, `wtuc`. While much of their cumulative influence on a community may be captured in the `taxpc` variable - and thus we must beware excessive collinearity - different groupings of those wage variables may provide insight into well- or under-funded segments of the local economy. We discuss these alternative specifications below under Model 2.
 
-While we believe these variables are sufficiently distinct to warrant their own model, we believe they may exhibit some colinearity with the predictors we included in \textbf{Model 1}. Specifically, we suspect `taxpc` and `density` may be colinear with `polpc`; `pctymle` and `pctmin80` may be colinear with `prbarr`; and government wages (`wfed`, `wsta`, `wloc`) may be colinear with `prbconv`.^[The expected colinearity of government wages with `prbconv` is premised on a theorized relationship between `prbconv` as an outcome variable and the quality or effectiveness of police investigators, court-appointed advocates, judges, and other government officials \textit{as proxied} loosely \textit{by wage}.] We theorize that both `prbpris` and `avgsen` may be colinear with some underlying omitted variable (for instance, local sentencing guidelines), but lack an alternative variable that might serve as a reasonable proxy. We will conduct checks for colinearity when analyzing our models.
+While we believe these variables are sufficiently distinct to warrant their own model, we believe they may exhibit some collinearity with the predictors we included in \textbf{Model 1}. Specifically, we suspect `taxpc` and `density` may be collinear with `polpc`; `pctymle` and `pctmin80` may be collinear with `prbarr`; and government wages (`wfed`, `wsta`, `wloc`) may be collinear with `prbconv`.^[The expected collinearity of government wages with `prbconv` is premised on a theorized relationship between `prbconv` as an outcome variable and the quality or effectiveness of police investigators, court-appointed advocates, judges, and other government officials \textit{as proxied} loosely \textit{by wage}.] We theorize that both `prbpris` and `avgsen` may be collinear with some underlying omitted variable (for instance, local sentencing guidelines), but lack an alternative variable that might serve as a reasonable proxy. We will conduct checks for collinearity when analyzing our models.
 
 \textbf{Theme 3: `The Kitchen Sink, or, everything else'}
 
@@ -328,21 +332,21 @@ There are \href{http://www.sfu.ca/~pendakur/teaching/buec333/The\%20Classical\%2
 
 1. \textit{Linear population model}: The model is linear in the coefficients of the predictors, correctly specified, and has an additive error term. 
 
-2. \textit{Random Sampling}: The data on which the model is based represent a random sample from the population.
+2. \textit{Random Sampling}: The data on which the model is based represents a random sample from the population and the generative mechanism produces i.i.d data.
 
 3. \textit{No perfect multicollinearity}: None of the predictors in the models are perfect linear combinations of each other.
 
 4. \textit{Zero-conditional mean / Exogeneity}: 
-    $$E[u|x] = 0$$
-    $$Cov(x_i,u)=0 ; i=1...k$$
+    $$E[u|x_i] = 0;\text{ }i=1...k$$
+    $$Cov(x_i,u)=0 ;\text{ } i=1...k$$
     $$E[u]=0$$
 
 5. \textit{Homoskedasticity}: Residuals display equal variance for all $X_i$.
-    $$Var(u|x)=\sigma^2$$
+    $$Var(u|x_i)=\sigma^2]; \text{ } i=1...k$$
 
 6. \textit{Normality of Errors}: Residuals will be normally distributed.
 
-We cannot empirically test \textbf{CLM2}, so we will omit it from our discussion of the models.
+We cannot empirically test \textbf{CLM2}, but we will assume it is met as our "universe" is counties in N.C and we have data on the entire population.
 
 ### Model 1: Crime and Punishment
 
@@ -417,7 +421,7 @@ stargazer(mod1, header = FALSE, type = "latex",
 
 \textbf{Comments on Model 1: Crime and Punishment}
 
-The \textit{p}-value associated with our heteroskedasticity-robust F-test is highly significant, indicating that our model is more predictive than a simple horizontal line at a y-intercept would be. The adjusted $R^2$ of our model is `r round(mod1_summ$adj.r.squared, 3)`, which is pretty good.
+The \textit{p}-value associated with our heteroskedasticity-robust F-test is highly significant, indicating that our model is more predictive than a simple horizontal line at a y-intercept would be. The adjusted $R^2$ of our model is `r round(mod1_summ$adj.r.squared, 3)`, which is reasonably high given the complexity of crime.
 
 We highlight four main observations:
 
@@ -459,7 +463,7 @@ Before we examine the coefficients of our model, we generate our diagnostic plot
 plot(mod2_b)
 ```
 
-Overall, the most salient feature of these diagnostic plots is how similar they are to the plots for \textbf{Model 1}. That being said, we do see improvement in the plot of residuals vs. fitted values as there appears to be less correlation between our independent variable and the residuals.  Additionally, while there may be some non-linearity (suggesting a violation of zero conditional mean) it occurs at very low and high predicted values, where we have very few data points.  Therefore, it is difficult to say if this is a true violation of CLM4, or simmply a result of randomness.
+Overall, the most salient feature of these diagnostic plots is how similar they are to the plots for \textbf{Model 1}. That being said, we do see improvement in the plot of residuals vs. fitted values as there appears to be less correlation between our independent variable and the residuals.  Additionally, while there may be some non-linearity (suggesting a violation of zero conditional mean) it occurs at very low and high predicted values, where we have very few data points, and therefore we will operate under the assumption that our zero conditional mean assumption is valid.
 
 One interesting difference is that two observations - for the counties at indices $25$ and $84$ - are now both high-leverage and high-influence, with Cook's distances of $>0.5$ and $>1.0$ respectively. Which counties might those represent?
 
@@ -579,7 +583,7 @@ The \texttt{pctmin80} interpretation is more straightforward, although again it 
 
 #### Joint Wage Significance
 
-In the previous section we discussed the significance of the "service wage" variable.  A single wage variable might be signififant just by chance, so one way to gauge if wage levels in general are predictive would be to calculate an F statistic for a join hypothesis test.  This will help us determine if wage levels are jointly significant.  First, we will look at the distributions of wage variables to ensure nothing is too abnormal:
+In the previous section we discussed the significance of the "service wage" variable.  A single wage variable might be significant just by chance when there are 9 such variables, so one way to gauge if wage levels in general are predictive would be to calculate an F statistic for a joint hypothesis test.  First, we will look at the distributions of wage variables to ensure nothing is too abnormal:
 
 ```{r warning=FALSE}
 wage_plot <- crime_na %>%
@@ -599,7 +603,7 @@ wage_plot <- crime_na %>%
 wage_plot
 ```  
 
-Next, we will calculate the F statistic for our joint hypothesis (All wage coefficients equal to zero):
+None of the distributions look too extreme, and therefore we will calculate the F statistic for our joint hypothesis (All wage coefficients equal to zero):
 
 $$F = \frac{(SSR_{\text{restricted}} - SSR_{\text{unrestricted}})/q}{SSR_{\text{unrestricted}} / (n-k-1)}$$
 
@@ -615,7 +619,7 @@ When considered collectively wage levels are significant at the .05 significance
 
 ## Model 3
 
-\textbf{Model 2} yielded greater predictive value than \textbf{Model 1} by including a few extra covariates. \textbf{Model 3} throws in essentially every variable in the dataset.
+\textbf{Model 2} yielded greater predictive value than \textbf{Model 1} by including a few extra covariates. \textbf{Model 3} throws in every available variable in the dataset.
 
 \begin{align}
     \texttt{crmrte} = \beta_0 &+ \beta_1\log(\texttt{polpc}) + \beta_2\log(\texttt{prbarr}) + \beta_3\texttt{prbconv} + \beta_4\texttt{prbpris} + \beta_5\texttt{avgsen} \tag{Model 1} \nonumber \\
@@ -625,7 +629,7 @@ When considered collectively wage levels are significant at the .05 significance
     &+ \beta_{19}\texttt{mix} + \beta_{20}\texttt{central} + \beta_{21}\texttt{west} + \beta_{22}\texttt{urban} + \beta_{23}\texttt{county} + u
 \end{align}
 
-Given the countless ways behavioral issues are interconnected, we wondered whether every variable we had data on might be correlated with either the crime rate or an already included variable in some fashion.  Our focus was to determine if including all our variables substantially changed the significance or corefficient of any of our previously included variables.  Additionally, we wanted to understand if any of the variables we had previously left out were in fact predictive overall. 
+Given the countless ways behavioral issues are interconnected, we wondered whether every variable we had data on might be correlated with either the crime rate or an already included variable in some fashion.  Our focus was to determine if including all our variables substantially changed the significance or coefficient of any of our previously included variables.  Additionally, we wanted to understand if any of the variables we had previously left out were in fact predictive overall. 
 
 ``` {r mod_3transforms}
 #Linear model including our key explanatory variables, suspected covariates, and most other variables
@@ -674,7 +678,7 @@ stargazer(mod3, header = FALSE, type = "latex",
 \pagebreak
 \textbf{Comments on Model 3: The Kitchen Sink}
 
-Similarly to model 2, we find that log police per capita, log probability of arrest, log probability of conviction, square root of density, and percent minority are significant.  While model 3 coefficients do change relative to model 2, there are not any drastic changes, or sign (+/-) changes indicating a reversal of effect.
+Similar to model 2, we find that log police per capita, log probability of arrest, log probability of conviction, square root of density, and percent minority are significant.  While model 3 coefficients do change relative to model 2, there are not any drastic changes, or sign (+/-) changes indicating a reversal of effect.
 
 Our adjusted R squared value for this model is `r round(summary(mod3)$adj.r.squared, 3)` which represents a negligible improvement over our previous model.
 
@@ -693,9 +697,9 @@ stargazer(mod1, mod2_b, mod3,
 
 ## Omitted Variables
 
-Despite the promising results from our three models it is difficult to ascribe causality to the variables of interest.  One issue with causal inference in general is ommitted variable bias, which can invalidate our ability to assume each explanatory variable is uncorrelated with the error term.  While we may not always be able to include a variable in our model, there are times when we can calculate the direction of the bias.
+Despite the promising results from our three models it is difficult to ascribe causality to the variables of interest.  One issue with causal inference in general is omitted variable bias, which can invalidate our ability to assume each explanatory variable is uncorrelated with the error term.  While we may not always be able mitigate this by including the variable, there are times when we can calculate the direction of the bias.
 
-As a quick refresher to the reader, the Bias in the coefficient of X1 as a result of an ommitted variable X2 is equal to the product of the omitted variable's coefficient if it were to be included in the population model (Beta 2), and the coefficient belonging to X1 when X2 is regressed on X1.
+As a quick refresher to the reader, the Bias in the coefficient of X1 as a result of an omitted variable X2 is equal to the product of the omitted variable's coefficient if it were to be included in the population model (Beta 2), and the coefficient belonging to X1 when X2 is regressed on X1 (delta).
 
 True Model:
 $$y=\beta_0+\beta_1 x_1+\beta_2x_2 + u$$
@@ -711,20 +715,20 @@ While there are infinite variables which exist, there are several which we belie
 
 1) Political Party in Control: Traditionally crime policy and legislation is a partisan issue, with each party having very different approaches to crime reduction.  All else being equal, we might expect police levels and average sentence lengths to be correlated with the party that is crafting legislation.  Assuming we construct our variable as a boolean indicator ("is_republican"), our assumption would be a positive correlation between "is_repulican" and the two aforementioned variables.  Unfortunately, there isn't any theory to guide us on whether "is_republican" would be correlated with crime rate.  As such we can't accurately anticipate the direction of the bias.  While outside the scope of this research we could either a) perform an ancillary exploration to determine the correlation between crime rates and political party, or b) append political party to our data.
 
-2) Unemployment Rate: While we have data on weekly wages, this does nothing to tell us what percentage of the population was actually earning those wages.  It is likely that a higher unemployment rate would be positively correlated with higher rates of crime as people who may not normally commit criminal activity are pushed to their limits.  We would anticipate that tax revenue per capita is negatively correlated with unemployment, which would suggest a negative bias.  We might also wish to be more granular, and include both minority and majority unemployment rates to help control for racial inequality.  This data could be obtained from the Bearue of Labor Statistics; we leave this next step to future researchers.
+2) Unemployment Rate: While we have data on weekly wages, this does nothing to tell us what percentage of the population was actually earning those wages.  It is likely that a higher unemployment rate would be positively correlated with higher rates of crime as people who may not normally commit criminal activity are pushed to their limits.  We would anticipate that tax revenue per capita is negatively correlated with unemployment, which would in turn, suggest a negative bias.  We might also wish to be more granular, and include both minority and majority unemployment rates to help control for racial inequality.  This data could be obtained from the Bureau of Labor Statistics; we leave this next step to future researchers.
 
-3) Concentrated/Siloed Urban Blight: Our data is at the county level and therefore may obscure differences within the county.  We would expect there to be a difference in crime rates between a county which is relatively homogenous with respect to the variables, and one which has drastic differences (e.g. a very poor area and a very nice area).  One way to proxy this might be to calculate a normalized standard deviation of housing prices which could help capture if this phenomenom exists.  Because this is a phenomenom which occurs mainly in cities, we would expect our normalized standard deviation variable to be positvely correlated with both density and crime rate.  As such, we would anticipate there to be a positive bias in the coefficient for density.  
+3) Concentrated/Siloed Urban Blight: Our data is at the county level and therefore may obscure differences within the county.  We would expect there to be a difference in crime rates between a county which is relatively homogenous with respect to the variables, and one which has drastic differences (e.g. a very poor area and a very nice area).  One way to proxy this might be to calculate a normalized standard deviation of housing prices which could help capture if this phenomenon exists.  Because this is a phenomenon which occurs mainly in cities, we would expect our normalized standard deviation variable to be positively correlated with both density and crime rate.  As such, we would anticipate there to be a positive bias in the coefficient for density.  
 
-4) Policing Methodology: In recent years there has been a growing focus on "warrior" versus "guardian" mindsets in policing.  Depending on the type of methodology we might see very different rates of arrest and conviction.  We suspect that a "gaurdian" mindset is negatively correlated with arrest and conviction rates, but unfortunately we have no a priori beliefs regarding the correlation between crime rates and police methodology prohbiting our ability to predict bias direction.
+4) Policing Methodology: In recent years there has been a growing focus on "warrior" versus "guardian" mindsets in policing.  Depending on the type of methodology we might see very different rates of arrest and conviction.  We suspect that a "guardian" mindset is negatively correlated with arrest and conviction rates, but unfortunately, we have no a priori beliefs regarding the correlation between crime rates and police methodology prohibiting our ability to predict bias direction.
 
-5) Police Representation: A community's relationship with the police can vary drastically from place to place.  In recent years certain cities have had significant unrest, with a key element being a majority white police force existing in a largely minority community.  Similar to police methodology, we might expect very different rates of arrest and conviction depending on whether the community feels the police represent them and their interests.  If we express police representation as a variable from 0 to 1 with 1 being perfect representation, then we would expect this variable to be negatively correlated with crime rates (we presume this indicates a closer police community bond).  We might also reason that it would be negatively correlated with arrest rates, suggesting our coefficient for arrest rates woud have a positive bias.  
+5) Police Representation: A community's relationship with the police can vary drastically from place to place.  In recent years certain cities have had significant unrest, with a key element being a majority white police force existing in a largely minority community.  Like police methodology, we might expect very different rates of arrest and conviction depending on whether the community feels the police represent them and their interests.  If we express police representation as a variable from 0 to 1, with 1 being perfect representation, then we would expect this variable to be negatively correlated with crime rates (we presume this indicates a closer police community bond).  We might also reason that it would be negatively correlated with arrest rates, suggesting our coefficient for arrest rates would have a positive bias.  
 
-6) Criminals' Perception of Risk-Reward Ratios: Of particular relevance to the Model 1 ("Crime and Punishment") analysis is the issue of criminals' perception of the \`\`effectiveness'' of the justice system. The model makes two critical assumptions: first, that criminality is driven by rational behavior; second, that criminals have sufficient insight into the outcomes of criminal justice proceedings for their decisions (which we are assuming to be rational) to be informed by them. Obviously if criminals are not of the genus \textit{Homo economicus}, a major theoretical underpinning of the model is removed. However, even if criminals \textit{are} rational actors, they may be operating with imperfect information: they may make the "incorrect" risk-reward calculation if they are unaware of how risky their criminality truly is. For instance, a thief who does not know the District Attorney always \`gets her man' may not be deterred by a high `prbconv` as our model might assume. Similarly, the salience of the potential punishment \textbf{\color{red}{<- TS: Need to finish this thought...}}
+6) Criminals' Perception of Risk-Reward Ratios: Of particular relevance to the Model 1 ("Crime and Punishment") analysis is the issue of criminals' perception of the \`\`effectiveness'' of the justice system. The model makes two critical assumptions: first, that criminality is driven by rational behavior; second, that criminals have sufficient insight into the outcomes of criminal justice proceedings for their decisions (which we are assuming to be rational) to be informed by them. Obviously if criminals are not of the genus \textit{Homo economicus}, a major theoretical underpinning of the model is removed. However, even if criminals \textit{are} rational actors, they may be operating with imperfect information: they may make the "incorrect" risk-reward calculation if they are unaware of how risky their criminality truly is. For instance, a thief who does not know the District Attorney always \`gets her man' may not be deterred by a high `prbconv` as our model might assume. In a perfect model we would have variable which captures the degree to which individuals both have accurate information and act rationally.  We might assume that higher levels of rationality are negatively correlated with crime rates as well as with percentage of young males; therefore we would expect the coefficient for our "pctymle" variable to have a positive bias.
 
 
 ## Conclusion: Findings and Policy Recommendations
 
-Unfortunately, we only have a single cross section of data at our disposal and therefore it is nearly impossible to determine whether our variables are causes or effects.  In reality it is most likely a combination of both, with changes in crime rate driving changes in policy, which in turn impact crime rates, ad infinitum.  Because our ability to conduct causal inference is restricted, it would be unwise to make specific policy reccomendations based on our model.
+Unfortunately, we only have a single cross section of data at our disposal and therefore it is nearly impossible to determine whether our variables are causes or effects.  In reality, it is most likely a combination of both, with changes in crime rate driving changes in policy, which in turn impact crime rates, ad infinitum.  Because our ability to conduct causal inference is restricted, it would be unwise to make specific policy recommendations based on our model.
 
 We can recommend to our candidate that she advocate for increased investment in research that will investigate the relationships between crime rates and the following factors:
 
