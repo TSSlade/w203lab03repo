@@ -330,11 +330,15 @@ There are \href{http://www.sfu.ca/~pendakur/teaching/buec333/The\%20Classical\%2
 
 2. \textit{Random Sampling}: The data on which the model is based represent a random sample from the population.
 
-3. \textit{No perfect multicollinearity}: None of the predictors in the models are perfect linear transformations of another predictor.
+3. \textit{No perfect multicollinearity}: None of the predictors in the models are perfect linear combinations of each other.
 
-4. \textit{Zero-conditional mean / Exogeneity}: There is no expected error in the regression function.
+4. \textit{Zero-conditional mean / Exogeneity}: 
+    $$E[u|x] = 0$$
+    $$Cov(x_i,u)=0 ; i=1...k$$
+    $$E[u]=0$$
 
 5. \textit{Homoskedasticity}: Residuals display equal variance for all $X_i$.
+    $$Var(u|x)=\sigma^2$$
 
 6. \textit{Normality of Errors}: Residuals will be normally distributed.
 
@@ -438,7 +442,7 @@ We highlight four main observations:
 
 ## Model 2: Demography and Economics 
 
-\textbf{Model 2} builds upon \textbf{Model 1} by including the additional covariates discussed earlier. As discussed above, we theorized that collapsing the nine wage variables into two or three that are logically grouped might be of use. The base (extended) version of \textbf{Model 2} would be as follows:
+\textbf{Model 2} builds upon \textbf{Model 1} by including the additional covariates discussed earlier.  If we are correct in our assumption that these are in fact relevant covariates, our model fit should improve and we should help mitigate omitted variable bias.  The base (extended) version of \textbf{Model 2} would be as follows:
 
 \begin{align}
     \texttt{crmrte} = \beta_0 &+ \beta_1\log(\texttt{polpc}) + \beta_2\log(\texttt{prbarr}) + \beta_3\log(\texttt{prbconv}) + \beta_4\texttt{prbpris} + \beta_5\texttt{avgsen} \tag{Model 1} \nonumber \\
@@ -447,15 +451,6 @@ We highlight four main observations:
     &+ \beta_{15}\texttt{wmfg} + \beta_{16}\texttt{wfed} + \beta_{17}\texttt{wsta} + \beta_{18}\texttt{wloc} + u
 \end{align}
 
-### Condensed Wage Metrics
-
-\textbf{\color{red}{$\downarrow$ TS: I am thinking we should consider cutting this out, or presenting it as a secondary (exploratory) model rather than our "main" model. The critique we got from the peer reviewers is spot-on: a straight average is an extremely naïve approach to combining the wage inputs, and likely doesn't make sense. A PCA or something might make more sense, but we've not the necessary data to do that on a per-county basis, which is the only unit for which it would fit and be relevant for our model.}}
-
-Each of the nine wage variables represents a different sector or group of industries.  We do not have \textit{a priori} justification to believe \textit{a single industry} might contribute disproportionately to crime, but we can assume that low wages in general might create an environment of economic scarcity in which crime incidence would increases.  Including all nine variables when our dataset only contains 90 observations would be extremely limiting, but excluding them entirely prohibits us from understanding how microeconomic conditions may be contributing to observed crime rates.  Researching the composition of each county's economy and weighting each variable accordingly might be a fruitful strategy, but it lies outside the scope of this report.  The solution we propose iss to create three new composite variables:
-
-  1) Government Wage: Average of `wfed` (federal government wage), `wsta` (state government wage), and `wloc` (local government wage)
-  2) Blue-Collar Wage: Average of `wmfg` (manufacturing), `wser` (service), `wcon` (construction)
-  3) Professional Wage: Average of `wfir` (Finance/Investment/Real Estate), `wtrd` (Wholesale/Retail Trade), and `wtuc` (Transportation, Utilities, Communication)
   
 ```{r warning=FALSE}
 crime_na %>% 
@@ -474,11 +469,6 @@ crime_na %>%
   xlim(0, 750) 
 ```  
 
-``` {r new_variable_creation}
-crime_na$govt_wg <- (crime_na$wfed+crime_na$wsta+crime_na$wloc)/3
-crime_na$physical_wg <- (crime_na$wmfg+crime_na$wser+crime_na$wcon)/3
-crime_na$industry_wg <- (crime_na$wfir+crime_na$wtrd+crime_na$wtuc)/3
-```
 
 ``` {r mod2_b, echo = TRUE, results = TRUE}
 #Model with our key explanatory variables, and what we suspect to be key covariates
@@ -499,7 +489,9 @@ Before we examine the coefficients of our model, we generate our diagnostic plot
 plot(mod2_b)
 ```
 
-Overall, the most salient feature of these diagnostic plots is how similar they are to the plots for \textbf{Model 1}. The plot of residuals vs. fitted values continues to suggest that the model is improperly specified, although perhaps marginally less so than before. The only striking difference is that two observations - for the counties at indices $25$ and $84$ - are now both high-leverage and high-influence, with Cook's distances of $>0.5$ and $>1.0$ respectively. Which counties might those represent?
+Overall, the most salient feature of these diagnostic plots is how similar they are to the plots for \textbf{Model 1}. That being said, we do see improvement in the plot of residuals vs. fitted values as there appears to be less correlation between our independent variable and the residuals.  Additionally, while there may be some non-linearity (suggesting a violation of zero conditional mean) it occurs at very low and high predicted values, where we have very few data points.  Therefore, it is difficult to say if this is a true violation of CLM4, or simmply a result of randomness.
+
+One interesting difference is that two observations - for the counties at indices $25$ and $84$ - are now both high-leverage and high-influence, with Cook's distances of $>0.5$ and $>1.0$ respectively. Which counties might those represent?
 
 ```{r mod2_highleverage}
 crime_na[c(25,84),c(1:10)]
@@ -549,6 +541,9 @@ stargazer(mod2_b, header = FALSE, type = "latex",
           add.lines = list(c("F Statistic", mod2_b_wF), c("Pr(>F)", mod2_b_wp)),
           notes = "p-values based on Wald test; robust standard errors in parentheses")
 ```
+
+In summary, model 2 satisfies the Classical Linear Model Assumptions of linearity (CLM1), no perfect multicollinearity (CLM3), zero conditional mean (CLM4), and normality of errors (CLM6).  While our homoskedasticity assumption is violated (CLM5) we are fortunately able to correct for this by using heteroskedasticity robust standard errors.  
+
 
 \textbf{Comments on Model 2: Demography and Economics}
 
