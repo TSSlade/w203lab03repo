@@ -190,7 +190,7 @@ make_qqs <- function(df, var_list, trans) {
 ```
 
 ```{r skewed_variables_illustrative, out.width="50%"}
-make_qqs('crime_na', 'prbconv', 'log')
+make_qqs('crime_na', 'polpc', 'log')
 ```
 
 From our graphs we saw that probability of conviction (`prbconv`), police per capita (`polpc`), probability of arrest (`prbarr`), tax revenue per capita (`taxpc`), population density (`density`), proportion of young males in the population (`pctymle`), and the mix of face-to-face vs. impersonal crimes (`mix`) all deviated from normality.  We will consider this in addition to other factors when deciding if a transformation would be beneficial.  
@@ -351,17 +351,6 @@ Drawing upon the transformations suggested by our exploratory data analysis and 
 \begin{align}
     \texttt{crmrte} = \beta_0 &+ \beta_1\log(\texttt{polpc}) + \beta_2\log(\texttt{prbarr}) + \beta_3\log(\texttt{prbconv}) + \beta_4\texttt{prbpris} + \beta_5\texttt{avgsen} + u
 \end{align}
-
-``` {r mod1_notransf, echo = FALSE, results = FALSE}
-#Linear Regression model using only our key variables of interest.
-#mod1_not <- with(crime_na, lm(crmrte ~ polpc+prbarr+prbconv+prbpris+avgsen))
-
-#Adding AIC to our model to help us compare models in the future.
-#mod1_not$AIC <- AIC(mod1_not)
-
-#Output model results in nice format using tidy and kable
-#kable(tidy(mod1_not))
-```
 
 ``` {r mod1_build}
 #Model for Theme 1
@@ -627,54 +616,56 @@ mod3 <- with(crime_na, lm(crmrte ~ log(polpc) + log(prbarr) + log(prbconv) + prb
 
 #Adding AIC to our model to help us compare models in the future.
 mod3$AIC <- AIC(mod3)
-
-#Output model results in nice format using tidy and kable
-kable(tidy(mod3))
 ```
 
 ```{r mod3_trans_diag, out.width="50%"}
 plot(mod3)
 ```
 
+Similar to the other models, the mean of the residuals appears to be centered on 0. Based on the Normal QQ plot our residuals appear to be fairly normal, except at the extremes of our model where there are fewer data points. Again, we apply the Shapiro-Wilke test for normality to our \textbf{Model 3} residuals.
 
 ```{r mod3_normality_residuals, echo = FALSE}
 shapiro.test(mod3$residuals)
 ```
 
-Model 3 Notes:
+Since the test results in a p value of less than 0.05 we reject the null hypothesis that the underlying distribution of the residuals in normal. To compensate, we will use heteroskedasticity robust statistical versions of the standard error, F and other values.
+
+```{r mod3_het_corrections}
+mod3_cov <- vcovHC(mod3, type = "HC1")
+mod3_pvals <- list(coeftest(mod3, vcov = mod3_cov)[,4])
+mod3_robse  <- list(sqrt(diag(mod3_cov)))
+mod3_wald <- waldtest(mod3, vcov = mod3_cov)
+mod3_wDf <- mod3_wald$Df[2]
+mod3_wF <- round(mod3_wald$F[2], 2)
+mod3_wp <- formatC(mod3_wald$`Pr(>F)`[2], format="e", digits = 2)
+mod3_summ <- summary.lm(mod3)
+```
+
+``` {r mod3_b_coeff_output, echo = FALSE, results = "asis"}
+stargazer(mod3, header = FALSE, type = "latex",
+          se = mod3_robse, p = mod3_pvals,
+          report="vc*s", star.cutoffs = c(0.05, 0.01, 0.001),
+          title = "Model 3: The Kitchen Sink", single.row = TRUE,
+          omit.stat = "f",
+          add.lines = list(c("F Statistic", mod3_wF), c("Pr(>F)", mod3_wp)),
+          notes = "p-values based on Wald test; robust standard errors in parentheses")
+```
+
+\pagebreak
+\textbf{Comments on Model 3: The Kitchen Sink}
 
 Similarly to model 2, we find that log police per capita, log probability of arrest, log probability of conviction, square root of density, and percent minority are significant.  While model 3 coefficients do change relative to model 2, there are not any drastic changes, or sign (+/-) changes indicating a reversal of effect.
 
 Our adjusted R squared value for this model is `r round(summary(mod3)$adj.r.squared, 3)` which represents a negligible improvement over our previous model.
 
-## Model 4
-
-One item we wished to investigate is whether we could build a more parsimonious model by selectively removing variables from our second model which did not appear to be significant.
-
-``` {r mod_4transforms}
-#Linear model including our key explanatory variables, suspected covariates, and most other variables
-mod4 <- with(crime_na, lm(crmrte ~ log(polpc) + log(prbarr) + log(prbconv) +
-                                    sqrt(density) + pctmin80 ))
-
-#Adding AIC to our model to help us compare models in the future.
-mod4$AIC <- AIC(mod4)
-
-#Output model results in nice format using tidy and kable
-kable(tidy(mod4))
-```
-
-```{r mod4_trans_diag}
-crPlots(mod4)
-```
-
 ## Model Comparison
 
-Below is a comparison table for our three initial models, as well as the fourth model that excluded all non-significant predictors. The table reports key statistics related to each model, including the coefficients for each predictor, the $R^2$ and adjusted $R^2$, and the \textit{Akaike information criterion}, or AIC. 
+Below is a comparison table for our three initial models. The table reports key statistics related to each model, including the coefficients for each predictor, the $R^2$ and adjusted $R^2$, and the \textit{Akaike information criterion}, or AIC. 
 
-Our findings match with what we would hope to see from a model building perspective: Our AIC and adjusted $R^2$ numbers suggest that of our three original models, \textit{Model 2} (which includes both our key explanatory variables and plausible covariates) performs the best. Our model which excludes key covariates has significantly less predictive power (as measured by adjusted $R^2$), and our model which includes everything--despite having the highest  $R^2$ values--performs slightly less well on the AIC (a measure of explanatory power and parsimony).
+Our findings match with what we would hope to see from a model building perspective: Our AIC and adjusted $R^2$ numbers suggest that of our three original models, \textit{Model 2} (which includes both our key explanatory variables and plausible covariates) performs the best. Our model which excludes key covariates has significantly less predictive power (as measured by adjusted $R^2$), and our model which includes everything--despite having the highest $R^2$ values--performs slightly less well on the AIC.  This behavior is expected because AIC is a measure of explanatory power and parsimony, where a model with a larger number of variables is penalized.  This is an attractive property of AIC because it illustrates how a model can become over fitted and brittle when an excess of independent variables are included.
 
 ```{r stargazer, results = "asis"}
-stargazer(mod1, mod2_b, mod3, mod4,
+stargazer(mod1, mod2_b, mod3,
           type = "latex", report="vc*s", header=FALSE,
           title = "Linear Models Predicting Crime Rate", single.row = TRUE,
           keep.stat = c("aic", "rsq","adj.rsq","n"), omit.table.layout = "n")
