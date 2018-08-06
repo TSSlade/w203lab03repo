@@ -451,25 +451,6 @@ We highlight four main observations:
     &+ \beta_{15}\texttt{wmfg} + \beta_{16}\texttt{wfed} + \beta_{17}\texttt{wsta} + \beta_{18}\texttt{wloc} + u
 \end{align}
 
-  
-```{r warning=FALSE}
-crime_na %>% 
-  gather(wfed, wtuc, wsta, wmfg, wfir, wloc, wcon, wser, wtrd, key = 'work_type',
-         value = 'weekly_wage') %>%
-  select(county, work_type, weekly_wage, everything()) %>%
-  mutate(work_type = factor(work_type, c('wfed', 'wtuc', 'wsta', 'wmfg', 'wfir',
-                                         'wloc', 'wcon', 'wser', 'wtrd'))) %>%
-  ggplot(aes(x = weekly_wage, fill = work_type)) +
-  geom_density(alpha = 0.5) +
-  scale_fill_brewer(palette = 'Spectral') +
-  ggtitle('Weekly Wage Density by position') +
-  xlab('Weekly Wage $/week') +
-  ylab('Density') +
-  labs(fill = 'Work type') +
-  xlim(0, 750) 
-```  
-
-
 ``` {r mod2_b, echo = TRUE, results = TRUE}
 #Model with our key explanatory variables, and what we suspect to be key covariates
 mod2_b <- with(crime_na, lm(crmrte ~ log(polpc) + log(prbarr) + log(prbconv) +
@@ -603,6 +584,41 @@ Indeed, we see that it does. Practically speaking, however, it is unclear whethe
 Applying our interpretive lens to $\sqrt{\texttt{density}}$ is not so straightforward. This is one of the tradeoffs we make for improving our model fit: we may sacrifice the ability to easily explain the effect. So we will not attempt to explain it beyond the earlier observation that at higher population densities, each marginal person per square mile modifies our prediction of crime rate less and less.
 
 The \texttt{pctmin80} interpretation is more straightforward, although again it is important to recall that our model is merely predictive and does not provide causal explanations. Each increase in the percentage of minorities in the population in 1980 is associated with `r round(10000 * (mod2_b$coefficients[10]), 2)` more crimes per 10,000 people.
+
+#### Joint Wage Significance
+
+In the previous section we discussed the significance of the "service wage" variable.  A single wage variable might be signififant just by chance, so one way to gauge if wage levels in general are predictive would be to calculate an F statistic for a join hypothesis test.  This will help us determine if wage levels are jointly significant.  First, we will look at the distributions of wage variables to ensure nothing is too abnormal:
+
+```{r warning=FALSE}
+crime_na %>% 
+  gather(wfed, wtuc, wsta, wmfg, wfir, wloc, wcon, wser, wtrd, key = 'work_type',
+         value = 'weekly_wage') %>%
+  select(county, work_type, weekly_wage, everything()) %>%
+  mutate(work_type = factor(work_type, c('wfed', 'wtuc', 'wsta', 'wmfg', 'wfir',
+                                         'wloc', 'wcon', 'wser', 'wtrd'))) %>%
+  ggplot(aes(x = weekly_wage, fill = work_type)) +
+  geom_density(alpha = 0.5) +
+  scale_fill_brewer(palette = 'Spectral') +
+  ggtitle('Weekly Wage Density by position') +
+  xlab('Weekly Wage $/week') +
+  ylab('Density') +
+  labs(fill = 'Work type') +
+  xlim(0, 750) 
+```  
+
+Next, we will calculate the F statistic for our joint hypothesis (All wage coefficients equal to zero):
+
+$$F = \frac{(SSR_{\text{restricted}} - SSR_{\text{unrestricted}})/q}{SSR_{\text{unrestricted}} / (n-k-1)}$$
+
+``` {r joint_wage_significance, echo = TRUE, results = TRUE}
+#Conduct join hypothesis F-test to determine if wages are significant when considered collectively
+
+linearHypothesis(mod2_b,c("wcon=0", "wtuc=0","wtrd=0","wfir=0","wser=0",
+                        "wmfg=0", "wfed=0", "wsta=0", "wloc+0"), white.adjust = "hc1")
+
+```
+
+When considered collectively wage levels are significant at the .05 significance level. 
 
 ## Model 3
 
