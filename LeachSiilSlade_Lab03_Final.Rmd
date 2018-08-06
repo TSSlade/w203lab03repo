@@ -621,9 +621,9 @@ Given the countless ways behavioral issues are interconnected, we wondered wheth
 ``` {r mod_3transforms}
 #Linear model including our key explanatory variables, suspected covariates, and most other variables
 mod3 <- with(crime_na, lm(crmrte ~ log(polpc) + log(prbarr) + log(prbconv) + prbpris +
-                            avgsen + log(taxpc) + sqrt(density) + govt_wg + pctymle +
-                            pctmin80 + west + central + urban +
-                            physical_wg + industry_wg + mix))
+                            avgsen + log(taxpc) + sqrt(density) + pctymle +
+                            pctmin80 + west + central + urban + mix
+                          +wcon + wtuc + wtrd + wfir + wser + wmfg + wfed + wsta + wloc))
 
 #Adding AIC to our model to help us compare models in the future.
 mod3$AIC <- AIC(mod3)
