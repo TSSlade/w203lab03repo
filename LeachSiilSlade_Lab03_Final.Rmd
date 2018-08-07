@@ -202,10 +202,15 @@ While it is not a perfect approach due to the possible interactions amongst inde
 
 ``` {r relationship_of_interest, echo=TRUE, out.width = "50%"}
 make_scatters <- function(df, var_list, y, trans) {
-  if(!missing(trans)) {
-    var_list <- append(var_list, str_glue('{trans}({var_list})'))
+  var_list_new <- c()
+  for (var in var_list){
+    var_list_new <- append(var_list_new, var)
+    
+    if(!missing(trans)) {
+    var_list_new <- append(var_list_new, str_glue('{trans}({var})'))
+    }
   }
-  for (v in var_list){
+  for (v in var_list_new){
   print(ggplot(df, aes_string(x = v, y = y)) +
           geom_point() + 
           geom_smooth(method = 'lm', se = FALSE) +
@@ -585,8 +590,8 @@ The \texttt{pctmin80} interpretation is more straightforward, although again it 
 
 In the previous section we discussed the significance of the "service wage" variable.  A single wage variable might be significant just by chance when there are 9 such variables, so one way to gauge if wage levels in general are predictive would be to calculate an F statistic for a joint hypothesis test.  First, we will look at the distributions of wage variables to ensure nothing is too abnormal:
 
-```{r warning=FALSE}
-wage_plot <- crime_na %>%
+```{r warning=FALSE, out.height='45%'}
+crime_na %>%
   gather(wfed, wtuc, wsta, wmfg, wfir, wloc, wcon, wser, wtrd, key = 'work_type',
          value = 'weekly_wage') %>%
   select(county, work_type, weekly_wage, everything()) %>%
@@ -600,7 +605,6 @@ wage_plot <- crime_na %>%
   ylab('Density') +
   labs(fill = 'Work type') + 
   xlim(0, 750) 
-wage_plot
 ```  
 
 None of the distributions look too extreme, and therefore we will calculate the F statistic for our joint hypothesis (All wage coefficients equal to zero):
@@ -748,80 +752,35 @@ Four of them are simple to interpret: a 1% increase in the number of police is a
 
 \textbf{Detail: scatterplots of variables generated during EDA.}
 ```{r scatterplots_appendix, out.width="33%"}
-make_scatters <- function(df, var_list, y, trans) {
-  if(!missing(trans)) {
-    var_list <- append(var_list, str_glue('{trans}({var_list})'))
-  }
-  for (v in var_list){
-  print(ggplot(df, aes_string(x = v, y = y)) +
-          geom_point() + 
-          geom_smooth(method = 'lm', se = FALSE) +
-          xlab(v) +
-          ylab(substitute(y)) +
-          ggtitle(str_glue('{y} vs {v}'))
-        )
-    } 
-}
-make_scatters(crime_na, var_list = names(crime_na), "crmrte")
+make_scatters(crime_na, var_list = colnames(crime_na), "crmrte")
 ```
 
 \textbf{Detail: observations in which the `probability' variables did not behave as probabilities insofar as they fell outside the range of 0:1.}
 ```{r non_prob_appendix}
-non_prob
+non_prob %>% 
+  select(county, starts_with('prb')) %>%
+  kable()
 ```
 
 \textbf{Detail: code to generate qqplots for evaluation of normality in EDA step}
 ``` {r skewed_variables_appendix, out.width = "33%"}
-for (i in 1:length(colnames(crime_na))){
-  column_interest <- paste("crime_na$",colnames(crime_na)[i],sep='')
-  qqnorm(eval(parse(text=column_interest)),main=colnames(crime_na)[i])
-}
-```
-
-\textbf{Detail: code to explore `crime rate` vs. specific variables of interest}
-``` {r relationship_of_interest_appendix, out.width = "33%"}
-for (i in 1:length(colnames(crime_na))){
-  column_interest <- paste("crime_na$",colnames(crime_na)[i],sep='')
-  plot(eval(parse(text=column_interest)),crime_na$crmrte,main=colnames(crime_na)[i],
-       ylab="Crime Rate",xlab=colnames(crime_na)[i])
-}
+make_qqs('crime_na', colnames(crime_na))
 ```
 
 \textbf{Detail: pre- and post-transformation scatterplots and q-q plots}
 ```{r linearity1_appendix, out.width='50%'}
-make_scatters(df = crime_na, var_list = c('prbarr'), y = 'crmrte', trans = 'log')
-```
-```{r linearity2_appendix, out.width='50%'}
-make_scatters(df = crime_na, var_list = c('prbconv'), y = 'crmrte', trans = 'log')
-```
-```{r linearity3_appendix, out.width='50%'}
-make_scatters(df = crime_na, var_list = c('polpc'), y = 'crmrte', trans = 'log')
+make_scatters(df = crime_na, var_list = c('prbarr', 'prbconv', 'polpc', 'taxpc'), y = 'crmrte', trans = 'log')
 ```
 ```{r linearity4_appendix, out.width='50%'}
 make_scatters(df = crime_na, var_list = c('density'), y = 'crmrte', trans = 'sqrt')
 ```
-```{r linearity5_appendix, out.width='50%'}
-make_scatters(df = crime_na, var_list = c('taxpc'), y = 'crmrte', trans = 'log')
-```
+
 
 ``` {r skewnessgraphs_appendix, out.width = '50%', results='hide', fig.keep='all'}
-#Normality/skew with and without transformations
-print(c(qqnorm(crime_na$prbarr), qqnorm(log(crime_na$prbarr))))
-
+make_qqs(df = 'crime_na', var_list = c('prbarr', 'prbconv', 'polpc', 'taxpc'), trans = 'log')
 ```
 
-```{r prbconv_appendix, out.width = '50%', results='hide', fig.keep='all'}
-print(c(qqnorm(crime_na$prbconv), qqnorm(log(crime_na$prbconv))))
+```{r skewnessgraphs_appendix2, out.width = '50%', results='hide', fig.keep='all'}
+make_qqs(df = 'crime_na', var_list = c('density'), trans = 'sqrt')
 ```
 
-```{r polpc_appendix, out.width = '50%', results='hide', fig.keep='all'}
-print(c(qqnorm(crime_na$polpc), qqnorm(log(crime_na$polpc))))
-```
-
-```{r density_appendix, out.width = '50%', results='hide', fig.keep='all'}
-print(c(qqnorm(crime_na$density), qqnorm(sqrt(crime_na$density))))
-```
-
-```{r taxpc_appendix, out.width = '50%', results='hide', fig.keep='all'}
-print(c(qqnorm(crime_na$taxpc), qqnorm(log(crime_na$taxpc))))
-```
